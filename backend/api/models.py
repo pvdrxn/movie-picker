@@ -1,6 +1,12 @@
 from django.db import models
+from django.conf import settings
 
 class Movie(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="movies",
+    )
     title = models.CharField(max_length=255)
     overview = models.TextField()
     release_date = models.DateField(null=True, blank=True)

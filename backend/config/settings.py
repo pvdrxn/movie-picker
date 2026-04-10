@@ -106,7 +106,11 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # REST Framework Settings
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny', # Change to IsAuthenticated in production
+        # Default to secure; mark public endpoints explicitly.
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
