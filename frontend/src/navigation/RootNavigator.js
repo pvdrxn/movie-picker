@@ -4,8 +4,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { AuthContext } from "../auth/AuthContext";
 import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
-import { HomeScreen } from "../screens/HomeScreen";
 import { ActivityIndicator, View } from "react-native";
+import { MovieTabsNavigator } from "./MovieTabsNavigator";
 
 const Stack = createNativeStackNavigator();
 
@@ -25,9 +25,7 @@ export function RootNavigator() {
   return (
     <NavigationContainer>
       {isSignedIn ? (
-        <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: "#0B1220" }, headerTintColor: "#fff" }}>
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: "Movie Picker" }} />
-        </Stack.Navigator>
+        <MovieTabsNavigator />
       ) : (
         <Stack.Navigator
           initialRouteName="Login"
