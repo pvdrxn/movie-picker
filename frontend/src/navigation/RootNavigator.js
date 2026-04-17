@@ -25,10 +25,8 @@ export function RootNavigator() {
   return (
     <NavigationContainer>
       {isSignedIn ? (
-        <Stack.Navigator
-          screenOptions={{ headerStyle: { backgroundColor: "#0B1220" }, headerTintColor: "#fff" }}
-        >
-          <Stack.Screen name="Movies" component={HomeScreen} options={{ title: "Movies" }} />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Movies" component={HomeScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator

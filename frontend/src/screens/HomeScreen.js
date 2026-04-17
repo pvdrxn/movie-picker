@@ -1,6 +1,8 @@
-import React, { useContext, useState, useEffect, useCallback } from "react";
-import { Pressable, StyleSheet, Text, View, FlatList, ActivityIndicator } from "react-native";
+import React, { useContext, useState, useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, RefreshControl } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthContext } from "../auth/AuthContext";
+import { MovieCard } from "../components/MovieCard";
 import {
   fetchPopularMovies,
   fetchTrendingMovies,
@@ -17,151 +19,181 @@ const CATEGORIES = [
 
 export function HomeScreen() {
   const { signOut } = useContext(AuthContext);
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].key);
-  const [movies, setMovies] = useState([]);
+  const [categoryData, setCategoryData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchMovies = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const rotation = useRef(new Animated.Value(0)).current;
 
-    const category = CATEGORIES.find((c) => c.key === activeCategory);
-    if (!category) {
-      setLoading(false);
-      return;
-    }
-
+  const fetchAllCategories = async () => {
     try {
-      const data = await category.fetchFn();
-      setMovies(data.results || []);
+      const results = await Promise.all(
+        CATEGORIES.map(async (category) => {
+          const data = await category.fetchFn();
+          return { [category.key]: data.results || [] };
+        })
+      );
+
+      const merged = Object.assign({}, ...results);
+      setCategoryData(merged);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      rotation.setValue(0);
     }
-  }, [activeCategory]);
+  };
 
   useEffect(() => {
-    fetchMovies();
-  }, [fetchMovies]);
+    fetchAllCategories();
+  }, []);
+
+  const handleRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setError(null);
+
+    Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    fetchAllCategories();
+  };
+
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Movies</Text>
-        <Pressable onPress={signOut} hitSlop={10}>
+    <GestureHandlerRootView style={styles.root}>
+      <View style={styles.container}>
+        <Pressable onPress={signOut} hitSlop={10} style={styles.signOutButton}>
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
-      </View>
 
-      <View style={styles.tabs}>
-        {CATEGORIES.map((category) => (
-          <Pressable
-            key={category.key}
-            onPress={() => setActiveCategory(category.key)}
-            style={[
-              styles.tab,
-              activeCategory === category.key && styles.tabActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeCategory === category.key && styles.tabTextActive,
-              ]}
+        {(loading || refreshing) && !error ? (
+          <View style={styles.content}>
+            <Animated.Text
+              style={[styles.loadingText, { transform: [{ rotate: spin }] }]}
             >
-              {category.title}
+              ↻
+            </Animated.Text>
+            <Text style={styles.statusText}>
+              {refreshing ? "Refreshing..." : "Loading..."}
             </Text>
-          </Pressable>
-        ))}
+          </View>
+        ) : error ? (
+          <View style={styles.content}>
+            <Text style={styles.error}>Error: {error}</Text>
+            <Pressable onPress={handleRefresh} style={styles.retryButton}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#fff"
+                colors={["#fff"]}
+              />
+            }
+          >
+            {CATEGORIES.map((category) => (
+              <View key={category.key} style={styles.section}>
+                <Text style={styles.sectionTitle}>{category.title}</Text>
+                <FlatList
+                  data={categoryData[category.key] || []}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => <MovieCard movie={item} />}
+                  contentContainerStyle={styles.sectionList}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        )}
       </View>
-
-      {loading ? (
-        <View style={styles.content}>
-          <ActivityIndicator size="large" color="#fff" />
-        </View>
-      ) : error ? (
-        <View style={styles.content}>
-          <Text style={styles.error}>Error: {error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={movies}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <Text style={styles.movieTitle}>{item.title}</Text>
-          )}
-          contentContainerStyle={styles.list}
-        />
-      )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: "#0B1220",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
-  },
-  title: {
-    color: "#fff",
-    fontSize: 28,
-    fontWeight: "800",
+  signOutButton: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
   },
   signOutText: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 14,
     fontWeight: "600",
   },
-  tabs: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 8,
-    marginHorizontal: 2,
-  },
-  tabActive: {
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
-  tabText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  tabTextActive: {
-    color: "#fff",
-  },
   content: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  list: {
-    paddingHorizontal: 20,
+  loadingText: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 32,
+    marginBottom: 8,
   },
-  movieTitle: {
-    color: "#fff",
+  statusText: {
+    color: "rgba(255,255,255,0.5)",
     fontSize: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
   },
   error: {
     color: "#ff6b6b",
     fontSize: 16,
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  scrollContent: {
+    paddingTop: 50,
+    paddingBottom: 24,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  sectionList: {
+    paddingHorizontal: 20,
   },
 });
