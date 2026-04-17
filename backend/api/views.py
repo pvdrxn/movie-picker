@@ -1,16 +1,24 @@
-from rest_framework import viewsets, generics, permissions
+from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
-from .models import Movie
-from .serializers import MovieSerializer, RegisterSerializer
+from .models import PickedMovie
+from .serializers import RegisterSerializer, PickedMovieSerializer
 
-class MovieViewSet(viewsets.ModelViewSet):
-    serializer_class = MovieSerializer
+class PickedMovieViewSet(viewsets.ModelViewSet):
+    serializer_class = PickedMovieSerializer
 
     def get_queryset(self):
-        return Movie.objects.filter(user=self.request.user).order_by('-created_at')
+        return PickedMovie.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def list(self, request):
+        choice = request.query_params.get("choice")
+        queryset = self.get_queryset()
+        if choice:
+            queryset = queryset.filter(choice=choice)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -21,10 +29,14 @@ class RegisterView(generics.CreateAPIView):
 class MeView(generics.GenericAPIView):
     def get(self, request):
         user = request.user
+        saved_count = PickedMovie.objects.filter(user=user, choice="saved").count()
+        pass_count = PickedMovie.objects.filter(user=user, choice="pass").count()
         return Response(
             {
                 "id": user.id,
                 "username": user.username,
                 "email": user.email,
+                "saved_count": saved_count,
+                "pass_count": pass_count,
             }
         )

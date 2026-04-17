@@ -1,10 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import MovieViewSet, RegisterView, MeView
+from .views import PickedMovieViewSet, RegisterView, MeView
 
 router = DefaultRouter()
-router.register(r'movies', MovieViewSet, basename='movie')
+router.register(r'picks', PickedMovieViewSet, basename='pick')
 
 urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='auth-register'),
