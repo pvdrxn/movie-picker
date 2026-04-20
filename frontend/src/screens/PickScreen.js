@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Animated, Dimensions, Pressable, StyleSheet, Text, View, Image, Alert } from "react-native";
-import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import { View, Text, Image, StyleSheet, Dimensions, Pressable, Animated, PanResponder } from "react-native";
 import { fetchPopularMovies } from "../services/tmdb";
-import { addPick } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 
 export function PickScreen() {
   const [movies, setMovies] = useState([]);
@@ -30,65 +27,59 @@ export function PickScreen() {
       });
   }, []);
 
-  const animateSwipe = (direction, onComplete) => {
-    const toValue = direction === "right" ? SCREEN_WIDTH : -SCREEN_WIDTH;
-
-    Animated.spring(translateX, {
-      toValue,
+  const handleSwipe = (direction) => {
+    const targetX = direction === "right" ? SCREEN_WIDTH : -SCREEN_WIDTH;
+    
+    Animated.timing(translateX, {
+      toValue: targetX,
+      duration: 200,
       useNativeDriver: true,
-      speed: 20,
-      bounciness: 8,
     }).start(() => {
-      onComplete();
+      if (direction === "right") {
+        setSavedCount(c => c + 1);
+      } else {
+        setPassCount(c => c + 1);
+      }
+      setCurrentIndex(c => c + 1);
       translateX.setValue(0);
     });
   };
 
-  const handleSwipe = (direction) => {
-    const movie = movies[currentIndex];
-    if (!movie) return;
+  const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
-    const choice = direction === "right" ? "saved" : "pass";
-
-    addPick({
-      tmdbId: movie.id,
-      title: movie.title,
-      posterPath: movie.poster_path,
-      rating: movie.vote_average,
-      choice,
-    })
-      .then(() => {
-        if (choice === "saved") {
-          setSavedCount((c) => c + 1);
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        translateX.setValue(gestureState.dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > 50) {
+          handleSwipe("right");
+        } else if (gestureState.dx < -50) {
+          handleSwipe("left");
         } else {
-          setPassCount((c) => c + 1);
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
         }
-      })
-      .catch((err) => {
-        Alert.alert("Error", "Failed to save pick");
-        console.error(err);
-      });
-
-    setCurrentIndex((prev) => prev + 1);
-  };
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      translateX.setValue(event.translationX);
+      },
     })
-    .onEnd((event) => {
-      if (event.translationX > SWIPE_THRESHOLD) {
-        animateSwipe("right", () => handleSwipe("right"));
-      } else if (event.translationX < -SWIPE_THRESHOLD) {
-        animateSwipe("left", () => handleSwipe("left"));
-      } else {
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          bounciness: 10,
-        }).start();
-      }
-    });
+  ).current;
+
+  const opacity = translateX.interpolate({
+    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    outputRange: [0.5, 1, 0.5],
+    extrapolate: 'clamp',
+  });
+
+  const scale = translateX.interpolate({
+    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    outputRange: [0.85, 1, 0.85],
+    extrapolate: 'clamp',
+  });
 
   if (loading) {
     return (
@@ -110,95 +101,86 @@ export function PickScreen() {
   const noMoreMovies = !currentMovie;
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Pick Movies</Text>
-        <Text style={styles.subtitle}>
-          Swipe right to save · Swipe left to pass
-        </Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Pick Movies</Text>
+      <Text style={styles.subtitle}>
+        Swipe right to save · Swipe left to pass
+      </Text>
 
-        {noMoreMovies ? (
-          <View style={styles.doneContainer}>
-            <Text style={styles.doneText}>No more movies!</Text>
-            <Text style={styles.pickedCount}>
-              Saved: {savedCount} · Pass: {passCount}
-            </Text>
-            <Pressable
-              onPress={() => {
-                setCurrentIndex(0);
-                setSavedCount(0);
-                setPassCount(0);
-              }}
-              style={styles.resetButton}
-            >
-              <Text style={styles.resetText}>Start Over</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.cardsContainer}>
-            <GestureDetector gesture={panGesture}>
-              <Animated.View
-                style={[
-                  styles.card,
-                  {
-                    transform: [{ translateX }],
-                  },
-                ]}
-              >
-                {currentMovie.poster_path ? (
-                  <Image
-                    source={{
-                      uri: `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}`,
-                    }}
-                    style={styles.cardImage}
-                  />
-                ) : (
-                  <View style={[styles.cardImage, styles.cardPlaceholder]}>
-                    <Text style={styles.placeholderText}>No Image</Text>
-                  </View>
-                )}
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardTitle}>{currentMovie.title}</Text>
-                  <Text style={styles.cardRating}>
-                    ★ {currentMovie.vote_average?.toFixed(1) || "N/A"}
-                  </Text>
-                </View>
-              </Animated.View>
-            </GestureDetector>
-          </View>
-        )}
+      {noMoreMovies ? (
+        <View style={styles.doneContainer}>
+          <Text style={styles.doneText}>No more movies!</Text>
+          <Text style={styles.pickedCount}>
+            Saved: {savedCount} · Pass: {passCount}
+          </Text>
+          <Pressable
+            onPress={() => {
+              setCurrentIndex(0);
+              setSavedCount(0);
+              setPassCount(0);
+            }}
+            style={styles.resetButton}
+          >
+            <Text style={styles.resetText}>Start Over</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.cardContainer} {...panResponder.panHandlers}>
+          <Animated.View
+            style={[
+              styles.card,
+              { transform: [{ translateX }, { scale }], opacity },
+            ]}
+          >
+            {currentMovie.poster_path ? (
+              <Image
+                source={{
+                  uri: `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}`,
+                }}
+                style={styles.cardImage}
+              />
+            ) : (
+              <View style={[styles.cardImage, styles.cardPlaceholder]}>
+                <Text style={styles.placeholderText}>No Image</Text>
+              </View>
+            )}
+            <View style={styles.cardInfo}>
+              <Text style={styles.cardTitle}>{currentMovie.title}</Text>
+              <Text style={styles.cardRating}>
+                ★ {currentMovie.vote_average?.toFixed(1) || "N/A"}
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
+      )}
 
-        {currentMovie && (
-          <View style={styles.buttons}>
-            <Pressable
-              onPress={() => animateSwipe("left", () => handleSwipe("left"))}
-              style={[styles.button, styles.passButton]}
-            >
-              <Text style={styles.buttonText}>✕ Pass</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => animateSwipe("right", () => handleSwipe("right"))}
-              style={[styles.button, styles.wantButton]}
-            >
-              <Text style={styles.buttonText}>♥ Save</Text>
-            </Pressable>
-          </View>
-        )}
-      </View>
-    </GestureHandlerRootView>
+      {currentMovie && (
+        <View style={styles.buttons}>
+          <Pressable
+            onPress={() => handleSwipe("left")}
+            style={[styles.button, styles.passButton]}
+          >
+            <Text style={styles.buttonText}>✕ Pass</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleSwipe("right")}
+            style={[styles.button, styles.wantButton]}
+          >
+            <Text style={styles.buttonText}>♥ Save</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     backgroundColor: "#0B1220",
     alignItems: "center",
     paddingTop: 60,
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
   },
   title: {
     color: "#fff",
@@ -219,22 +201,26 @@ const styles = StyleSheet.create({
     color: "#ff6b6b",
     fontSize: 16,
   },
-  cardsContainer: {
+  cardContainer: {
     flex: 1,
+    width: SCREEN_WIDTH,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
   },
   card: {
     width: SCREEN_WIDTH - 48,
     height: (SCREEN_WIDTH - 48) * 1.5,
     borderRadius: 16,
     backgroundColor: "#1a1a2e",
-    overflow: "hidden",
   },
   cardImage: {
     width: "100%",
     height: "85%",
     resizeMode: "cover",
+    overflow: "hidden",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   cardPlaceholder: {
     backgroundColor: "rgba(255,255,255,0.1)",

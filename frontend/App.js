@@ -8,7 +8,6 @@ export default function App() {
     <AuthProvider>
       <RootNavigator />
       <StatusBar style="light" />
-
     </AuthProvider>
   );
 }
