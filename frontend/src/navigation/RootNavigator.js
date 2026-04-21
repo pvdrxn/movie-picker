@@ -7,6 +7,7 @@ import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { PickScreen } from "../screens/PickScreen";
+import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
 import { ActivityIndicator, View, Text } from "react-native";
 
 const Stack = createNativeStackNavigator();
@@ -44,6 +45,19 @@ function MoviesTabs() {
   );
 }
 
+function AppStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MoviesTabs" component={MoviesTabs} />
+      <Stack.Screen
+        name="MovieDetails"
+        component={MovieDetailsScreen}
+        options={{ presentation: "modal", animation: "slide_from_bottom" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 export function RootNavigator() {
   const { isBootstrapping, isSignedIn } = useContext(AuthContext);
 
@@ -52,7 +66,7 @@ export function RootNavigator() {
   return (
     <NavigationContainer>
       {isSignedIn ? (
-        <MoviesTabs />
+        <AppStack />
       ) : (
         <Stack.Navigator
           initialRouteName="Login"

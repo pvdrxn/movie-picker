@@ -10,7 +10,17 @@ class PickedMovieViewSet(viewsets.ModelViewSet):
         return PickedMovie.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        tmdb_id = serializer.validated_data.get("tmdb_id")
+        PickedMovie.objects.update_or_create(
+            user=self.request.user,
+            tmdb_id=tmdb_id,
+            defaults={
+                "title": serializer.validated_data.get("title"),
+                "poster_path": serializer.validated_data.get("poster_path"),
+                "rating": serializer.validated_data.get("rating"),
+                "choice": serializer.validated_data.get("choice"),
+            },
+        )
 
     def list(self, request):
         choice = request.query_params.get("choice")

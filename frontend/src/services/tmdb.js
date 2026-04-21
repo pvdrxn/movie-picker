@@ -75,3 +75,8 @@ export async function fetchMovieDetails(movieId) {
   if (!movieId) throw new Error("movieId is required");
   return tmdbFetch(`/movie/${movieId}`);
 }
+
+export async function fetchMovieCredits(movieId) {
+  if (!movieId) throw new Error("movieId is required");
+  return tmdbFetch(`/movie/${movieId}/credits`);
+}

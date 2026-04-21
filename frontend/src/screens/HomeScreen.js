@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, RefreshControl } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useNavigation } from "@react-navigation/native";
 import { AuthContext } from "../auth/AuthContext";
 import { MovieCard } from "../components/MovieCard";
 import {
@@ -19,6 +20,7 @@ const CATEGORIES = [
 
 export function HomeScreen() {
   const { signOut } = useContext(AuthContext);
+  const navigation = useNavigation();
   const [categoryData, setCategoryData] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -117,7 +119,9 @@ export function HomeScreen() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(item) => item.id.toString()}
-                  renderItem={({ item }) => <MovieCard movie={item} />}
+                  renderItem={({ item }) => (
+                    <MovieCard movie={item} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+                  )}
                   contentContainerStyle={styles.sectionList}
                 />
               </View>

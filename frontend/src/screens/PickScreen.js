@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, Image, StyleSheet, Dimensions, Pressable, Animated, PanResponder } from "react-native";
 import { fetchPopularMovies } from "../services/tmdb";
+import { addPick } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -27,9 +28,25 @@ export function PickScreen() {
       });
   }, []);
 
-  const handleSwipe = (direction) => {
+  const handleSwipe = async (direction) => {
+    const movie = movies[currentIndex];
+    if (!movie) return;
+
     const targetX = direction === "right" ? SCREEN_WIDTH : -SCREEN_WIDTH;
-    
+    const choice = direction === "right" ? "saved" : "pass";
+
+    try {
+      await addPick({
+        tmdbId: movie.id,
+        title: movie.title,
+        posterPath: movie.poster_path,
+        rating: movie.vote_average,
+        choice,
+      });
+    } catch (err) {
+      console.warn("Failed to save pick:", err.message);
+    }
+
     Animated.timing(translateX, {
       toValue: targetX,
       duration: 200,

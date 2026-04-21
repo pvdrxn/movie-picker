@@ -14,7 +14,7 @@ export function MovieCard({ movie, onPress }) {
     : "N/A";
 
   return (
-    <Pressable onPress={onPress} style={styles.container}>
+    <Pressable onPress={() => onPress?.(movie)} style={styles.container}>
       <View style={styles.posterContainer}>
         {posterUri ? (
           <Image source={{ uri: posterUri }} style={styles.poster} />
