@@ -7,6 +7,7 @@ import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { PickScreen } from "../screens/PickScreen";
+import { SearchScreen } from "../screens/SearchScreen";
 import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
 import { ActivityIndicator, View, Text } from "react-native";
 
@@ -35,6 +36,11 @@ function MoviesTabs() {
         name="Browse"
         component={HomeScreen}
         options={{ tabBarLabel: "Browse" }}
+      />
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ tabBarLabel: "Search" }}
       />
       <Tab.Screen
         name="Pick"

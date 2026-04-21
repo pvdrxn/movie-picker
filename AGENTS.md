@@ -1,5 +1,8 @@
 # Movie Picker - Agent Instructions
 
+## Important Rules
+- **Always confirm with the user before importing any new packages or libraries into the project.**
+
 ## Tech Stack
 - **Frontend**: React Native + Expo (JavaScript)
 - **Backend**: Django + Django REST Framework (Python)

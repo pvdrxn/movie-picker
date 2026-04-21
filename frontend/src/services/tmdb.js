@@ -80,3 +80,20 @@ export async function fetchMovieCredits(movieId) {
   if (!movieId) throw new Error("movieId is required");
   return tmdbFetch(`/movie/${movieId}/credits`);
 }
+
+export async function fetchGenres() {
+  return tmdbFetch("/genre/movie/list");
+}
+
+export async function discoverMovies({ genreId, year, rating, page = 1 } = {}) {
+  const params = { page };
+  if (genreId) params.with_genres = genreId;
+  if (year) params.primary_release_year = year;
+  if (rating) params.vote_average_gte = rating;
+  return tmdbFetch("/discover/movie", params);
+}
+
+export async function searchMovies(query, { page = 1 } = {}) {
+  if (!query) return { results: [] };
+  return tmdbFetch("/search/movie", { query, page });
+}
