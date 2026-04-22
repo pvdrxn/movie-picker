@@ -52,7 +52,11 @@ async function tmdbFetch(path, params = {}) {
     throw new Error(`TMDB request failed: ${res.status} ${res.statusText}${details}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  if (data.results) {
+    data.results = data.results.filter(m => !m.adult);
+  }
+  return data;
 }
 
 export async function fetchPopularMovies({ page = 1 } = {}) {
@@ -85,11 +89,12 @@ export async function fetchGenres() {
   return tmdbFetch("/genre/movie/list");
 }
 
-export async function discoverMovies({ genreId, year, rating, page = 1 } = {}) {
+export async function discoverMovies({ genreId, startYear, endYear, rating, page = 1 } = {}) {
   const params = { page };
   if (genreId) params.with_genres = genreId;
-  if (year) params.primary_release_year = year;
-  if (rating) params.vote_average_gte = rating;
+  if (startYear) params["primary_release_date.gte"] = `${startYear}-01-01`;
+  if (endYear) params["primary_release_date.lte"] = `${endYear}-12-31`;
+  if (rating) params["vote_average.gte"] = rating;
   return tmdbFetch("/discover/movie", params);
 }
 

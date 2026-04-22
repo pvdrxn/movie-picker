@@ -13,6 +13,7 @@ export function SearchScreen() {
   const [query, setQuery] = useState("");
   const [startYear, setStartYear] = useState("");
   const [endYear, setEndYear] = useState("");
+  const [minRating, setMinRating] = useState("");
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -23,12 +24,15 @@ export function SearchScreen() {
   }, []);
 
   useEffect(() => {
-    if (!selectedGenre && !startYear && !endYear) return;
+    if (!selectedGenre && !startYear && !endYear && !minRating) {
+      fetchPopularMovies().then((data) => setMovies(data.results || [])).catch(console.error);
+      return;
+    }
     const debounce = setTimeout(async () => {
       setLoading(true);
       setHasSearched(true);
       try {
-        const results = await discoverMovies({ genreId: selectedGenre, startYear: startYear || undefined, endYear: endYear || undefined });
+        const results = await discoverMovies({ genreId: selectedGenre, startYear: startYear || undefined, endYear: endYear || undefined, rating: minRating || undefined });
         setMovies(results.results || []);
       } catch (err) {
         console.error(err);
@@ -37,10 +41,13 @@ export function SearchScreen() {
       }
     }, 500);
     return () => clearTimeout(debounce);
-  }, [startYear, endYear]);
+  }, [startYear, endYear, minRating, selectedGenre]);
 
   useEffect(() => {
-    if (!query) return;
+    if (!query) {
+      fetchPopularMovies().then((data) => setMovies(data.results || [])).catch(console.error);
+      return;
+    }
     const debounce = setTimeout(async () => {
       setLoading(true);
       setHasSearched(true);
@@ -59,16 +66,6 @@ export function SearchScreen() {
   const handleGenreSelect = async (genreId) => {
     setSelectedGenre(genreId === selectedGenre ? null : genreId);
     setQuery("");
-    setLoading(true);
-    setHasSearched(true);
-    try {
-      const results = await discoverMovies({ genreId: genreId === selectedGenre ? null : genreId, startYear: startYear || undefined, endYear: endYear || undefined });
-      setMovies(results.results || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -121,6 +118,16 @@ export function SearchScreen() {
               onChangeText={setEndYear}
               keyboardType="number-pad"
               maxLength={4}
+            />
+            <Text style={styles.yearSeparator}>|</Text>
+            <TextInput
+              style={styles.ratingInput}
+              placeholder="Rating"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={minRating}
+              onChangeText={setMinRating}
+              keyboardType="decimal-pad"
+              maxLength={3}
             />
           </View>
       </View>
@@ -243,6 +250,16 @@ filtersWrapper: {
   },
   yearInput: {
     flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 15,
+    textAlign: "center",
+  },
+  ratingInput: {
+    width: 80,
     backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 10,
     paddingHorizontal: 14,
