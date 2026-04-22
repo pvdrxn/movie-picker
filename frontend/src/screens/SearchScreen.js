@@ -1,40 +1,60 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable, ScrollView } from "react-native";
-import { fetchGenres, searchMovies, discoverMovies } from "../services/tmdb";
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import { fetchGenres, fetchPopularMovies, searchMovies, discoverMovies } from "../services/tmdb";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
 
 export function SearchScreen() {
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const columnPadding = 8;
   const [genres, setGenres] = useState([]);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [query, setQuery] = useState("");
+  const [startYear, setStartYear] = useState("");
+  const [endYear, setEndYear] = useState("");
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     fetchGenres().then((data) => setGenres(data.genres || [])).catch(console.error);
+    fetchPopularMovies().then((data) => setMovies(data.results || [])).catch(console.error);
   }, []);
 
-  const handleSearch = async () => {
-    if (!query && !selectedGenre) return;
-    setLoading(true);
-    setHasSearched(true);
-    try {
-      let results;
-      if (query) {
-        results = await searchMovies(query);
-      } else {
-        results = await discoverMovies({ genreId: selectedGenre });
+  useEffect(() => {
+    if (!selectedGenre && !startYear && !endYear) return;
+    const debounce = setTimeout(async () => {
+      setLoading(true);
+      setHasSearched(true);
+      try {
+        const results = await discoverMovies({ genreId: selectedGenre, startYear: startYear || undefined, endYear: endYear || undefined });
+        setMovies(results.results || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-      setMovies(results.results || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, 500);
+    return () => clearTimeout(debounce);
+  }, [startYear, endYear]);
+
+  useEffect(() => {
+    if (!query) return;
+    const debounce = setTimeout(async () => {
+      setLoading(true);
+      setHasSearched(true);
+      try {
+        const results = await searchMovies(query);
+        setMovies(results.results || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(debounce);
+  }, [query]);
 
   const handleGenreSelect = async (genreId) => {
     setSelectedGenre(genreId === selectedGenre ? null : genreId);
@@ -42,7 +62,7 @@ export function SearchScreen() {
     setLoading(true);
     setHasSearched(true);
     try {
-      const results = await discoverMovies({ genreId: genreId === selectedGenre ? null : genreId });
+      const results = await discoverMovies({ genreId: genreId === selectedGenre ? null : genreId, startYear: startYear || undefined, endYear: endYear || undefined });
       setMovies(results.results || []);
     } catch (err) {
       console.error(err);
@@ -55,35 +75,54 @@ export function SearchScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Search & Filters</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search movies..."
-          placeholderTextColor="rgba(255,255,255,0.4)"
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-        />
-        <Pressable style={styles.searchButton} onPress={handleSearch}>
-          <Text style={styles.searchButtonText}>Search</Text>
-        </Pressable>
+        <View style={styles.searchRow}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search movies..."
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+          />
+        </View>
       </View>
 
-      <View style={styles.filterSection}>
-        <Text style={styles.filterLabel}>Genres</Text>
+      <View style={styles.filtersWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.genreScroll}>
-          {genres.map((genre) => (
-            <Pressable
-              key={genre.id}
-              style={[styles.genreChip, selectedGenre === genre.id && styles.genreChipSelected]}
-              onPress={() => handleGenreSelect(genre.id)}
-            >
-              <Text style={[styles.genreText, selectedGenre === genre.id && styles.genreTextSelected]}>
-                {genre.name}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+            {genres.map((genre) => (
+              <Pressable
+                key={genre.id}
+                style={[styles.genreChip, selectedGenre === genre.id && styles.genreChipSelected]}
+                onPress={() => handleGenreSelect(genre.id)}
+              >
+                <Text style={[styles.genreText, selectedGenre === genre.id && styles.genreTextSelected]}>
+                  {genre.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={styles.yearRow}>
+            <TextInput
+              style={styles.yearInput}
+              placeholder="From"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={startYear}
+              onChangeText={setStartYear}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+            <Text style={styles.yearSeparator}>-</Text>
+            <TextInput
+              style={styles.yearInput}
+              placeholder="To"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={endYear}
+              onChangeText={setEndYear}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+          </View>
       </View>
 
       {loading ? (
@@ -95,17 +134,20 @@ export function SearchScreen() {
           <Text style={styles.emptyText}>No movies found</Text>
         </View>
       ) : (
-        <FlatList
-          data={movies}
-          numColumns={2}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.movieItem}>
-              <MovieCard movie={item} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
-            </View>
-          )}
-          contentContainerStyle={styles.listContent}
-        />
+        <View style={styles.movieListContainer}>
+          <FlatList
+            data={movies}
+            numColumns={2}
+            keyExtractor={(item) => item.id.toString()}
+            ListHeaderComponent={<View style={{ height: 4 }} />}
+            renderItem={({ item }) => (
+              <View style={styles.movieItem}>
+                <MovieCard movie={item} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+              </View>
+            )}
+            contentContainerStyle={{ paddingHorizontal: columnPadding, paddingBottom: 24, paddingRight: 8 }}
+          />
+        </View>
       )}
     </View>
   );
@@ -119,37 +161,50 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
     color: "#fff",
     fontSize: 28,
     fontWeight: "800",
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   searchInput: {
+    flex: 1,
     backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     color: "#fff",
     fontSize: 16,
-    marginBottom: 12,
   },
-  searchButton: {
-    backgroundColor: "#ff6464",
+  searchIconBtn: {
+    width: 44,
+    height: 44,
+    marginLeft: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 12,
-    paddingVertical: 12,
+    justifyContent: "center",
     alignItems: "center",
   },
-  searchButtonText: {
+  searchIcon: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 22,
+  },
+filtersWrapper: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  genreScroll: {
+    flexDirection: "row",
+    marginBottom: 12,
   },
   filterSection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   filterLabel: {
     color: "rgba(255,255,255,0.6)",
@@ -159,6 +214,7 @@ const styles = StyleSheet.create({
   },
   genreScroll: {
     flexDirection: "row",
+    marginBottom: 12,
   },
   genreChip: {
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -181,6 +237,28 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
+  yearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  yearInput: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 15,
+    textAlign: "center",
+  },
+  yearSeparator: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 18,
+    marginHorizontal: 12,
+  },
+  movieListContainer: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     justifyContent: "center",
@@ -194,13 +272,9 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.5)",
     fontSize: 16,
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
   movieItem: {
     flex: 1,
-    padding: 4,
+    paddingHorizontal: 4,
     maxWidth: "50%",
   },
 });
