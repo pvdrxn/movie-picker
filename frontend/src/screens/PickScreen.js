@@ -177,13 +177,13 @@ export function PickScreen() {
             onPress={() => handleSwipe("left")}
             style={[styles.button, styles.passButton]}
           >
-            <Text style={styles.buttonText}>✕ Pass</Text>
+            <Text style={styles.buttonText}>✕</Text>
           </Pressable>
           <Pressable
             onPress={() => handleSwipe("right")}
             style={[styles.button, styles.wantButton]}
           >
-            <Text style={styles.buttonText}>♥ Save</Text>
+            <Text style={styles.buttonText}>♥</Text>
           </Pressable>
         </View>
       )}

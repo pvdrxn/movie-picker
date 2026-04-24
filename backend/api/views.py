@@ -1,4 +1,5 @@
 from rest_framework import viewsets, generics, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import PickedMovie
 from .serializers import RegisterSerializer, PickedMovieSerializer
@@ -27,6 +28,12 @@ class PickedMovieViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         if choice:
             queryset = queryset.filter(choice=choice)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def saved(self, request):
+        queryset = self.get_queryset().filter(choice="saved")
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 

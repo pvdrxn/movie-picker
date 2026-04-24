@@ -1,5 +1,19 @@
 import { http } from "./http";
 
+const listeners = [];
+
+export function subscribePicks(callback) {
+  listeners.push(callback);
+  return () => {
+    const idx = listeners.indexOf(callback);
+    if (idx > -1) listeners.splice(idx, 1);
+  };
+}
+
+function notifyListeners() {
+  listeners.forEach(cb => cb());
+}
+
 export async function addPick({ tmdbId, title, posterPath, rating, choice }) {
   const payload = {
     tmdb_id: tmdbId,
@@ -12,8 +26,8 @@ export async function addPick({ tmdbId, title, posterPath, rating, choice }) {
   if (rating != null) {
     payload.rating = parseFloat(rating.toFixed(1));
   }
-  console.log("POST payload:", JSON.stringify(payload));
   const { data } = await http.post("/api/picks/", payload);
+  notifyListeners();
   return data;
 }
 

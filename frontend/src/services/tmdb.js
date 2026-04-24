@@ -53,7 +53,7 @@ async function tmdbFetch(path, params = {}) {
   }
 
   const data = await res.json();
-  if (data.results) {
+  if (data.results && Array.isArray(data.results)) {
     data.results = data.results.filter(m => !m.adult);
   }
   return data;
@@ -83,6 +83,16 @@ export async function fetchMovieDetails(movieId) {
 export async function fetchMovieCredits(movieId) {
   if (!movieId) throw new Error("movieId is required");
   return tmdbFetch(`/movie/${movieId}/credits`);
+}
+
+export async function fetchMovieWatchProviders(movieId) {
+  if (!movieId) throw new Error("movieId is required");
+  return tmdbFetch(`/movie/${movieId}/watch/providers`);
+}
+
+export async function fetchMovieVideos(movieId) {
+  if (!movieId) throw new Error("movieId is required");
+  return tmdbFetch(`/movie/${movieId}/videos`);
 }
 
 export async function fetchGenres() {

@@ -12,8 +12,8 @@ export function MovieCard({ movie, onPress }) {
     ? `${IMAGE_BASE_URL}${movie.poster_path}`
     : null;
 
-  const rating = movie.vote_average
-    ? movie.vote_average.toFixed(1)
+  const rating = (movie.vote_average != null)
+    ? Number(movie.vote_average).toFixed(1)
     : "N/A";
 
   return (
