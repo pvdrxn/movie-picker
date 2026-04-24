@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
-import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders } from "../services/tmdb";
+import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMovieTrailer, fetchMovieReleaseDates } from "../services/tmdb";
 import { addPick, getPicks, subscribePicks } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -11,7 +12,15 @@ export function MovieDetailsScreen({ route, navigation }) {
   const [movie, setMovie] = useState(null);
   const [credits, setCredits] = useState(null);
   const [watchProviders, setWatchProviders] = useState(null);
+  const [trailer, setTrailer] = useState(null);
+  const [releaseDates, setReleaseDates] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const handlePlayTrailer = async () => {
+    if (trailer?.key) {
+      await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
+    }
+  };
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
@@ -21,11 +30,15 @@ export function MovieDetailsScreen({ route, navigation }) {
       fetchMovieDetails(movieId),
       fetchMovieCredits(movieId),
       fetchMovieWatchProviders(movieId),
+      fetchMovieTrailer(movieId),
+      fetchMovieReleaseDates(movieId),
     ])
-      .then(([details, creditsData, providersData]) => {
+      .then(([details, creditsData, providersData, trailerData, releaseData]) => {
         setMovie(details);
         setCredits(creditsData);
         setWatchProviders(providersData);
+        setTrailer(trailerData);
+        setReleaseDates(releaseData);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -103,6 +116,31 @@ export function MovieDetailsScreen({ route, navigation }) {
   const cast = credits?.cast?.slice(0, 10) || [];
   const genres = movie.genres?.map((g) => g.name).join(" · ") || "";
 
+  const getAdditionalRatings = () => {
+    if (!releaseDates?.results) return null;
+    const usRelease = releaseDates.results.find(r => r.iso_3166_1 === "US");
+    if (!usRelease?.release_dates?.length) return null;
+    const certification = usRelease.release_dates.find(d => d.certification);
+    if (!certification?.certification) return null;
+    return certification.certification;
+  };
+
+  const getRatings = () => {
+    if (!releaseDates?.results) return [];
+    const ratings = [];
+    const seen = new Set();
+    const usRelease = releaseDates.results.find(r => r.iso_3166_1 === "US");
+    if (usRelease?.release_dates) {
+      usRelease.release_dates.forEach(date => {
+        if (date.certification && !seen.has(date.certification)) {
+          seen.add(date.certification);
+          ratings.push({ source: "US", value: date.certification });
+        }
+      });
+    }
+    return ratings;
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -127,6 +165,19 @@ export function MovieDetailsScreen({ route, navigation }) {
           <View style={styles.headerInfo}>
             <Text style={styles.title}>{movie.title}</Text>
             <Text style={styles.rating}>★ {movie.vote_average?.toFixed(1) || "N/A"}</Text>
+            {(() => {
+              const ratings = getRatings();
+              if (ratings.length === 0) return null;
+              return (
+                <View style={styles.ratingsContainer}>
+                  {ratings.map((r, i) => (
+                    <View key={i} style={styles.ratingBadge}>
+                      <Text style={styles.ratingBadgeText}>{r.source} {r.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
             <Pressable onPress={handleToggleFavorite} style={styles.favoriteButton}>
               <Ionicons
                 name={isFavorite ? "heart" : "heart-outline"}
@@ -168,6 +219,18 @@ export function MovieDetailsScreen({ route, navigation }) {
             {movie.overview || "No synopsis available."}
           </Text>
         </View>
+
+        {trailer && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Trailer</Text>
+            <Pressable
+              style={styles.trailerButton}
+              onPress={handlePlayTrailer}
+            >
+              <Ionicons name="play-circle" size={40} color="#fff" />
+            </Pressable>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cast</Text>
@@ -296,6 +359,25 @@ backButton: {
     color: "rgba(255,255,255,0.5)",
     fontSize: 12,
   },
+  ratingsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  ratingBadge: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginRight: 6,
+    marginTop: 4,
+  },
+  ratingBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+  },
   section: {
     padding: 16,
     paddingTop: 8,
@@ -392,6 +474,14 @@ backButton: {
     fontSize: 10,
     textAlign: "center",
     marginTop: 4,
+  },
+  trailerButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#e50914",
+    justifyContent: "center",
+    alignItems: "center",
   },
   noProvidersText: {
     color: "rgba(255,255,255,0.4)",

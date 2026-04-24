@@ -80,6 +80,16 @@ export async function fetchMovieDetails(movieId) {
   return tmdbFetch(`/movie/${movieId}`);
 }
 
+export async function fetchMovieExternalIds(movieId) {
+  if (!movieId) throw new Error("movieId is required");
+  return tmdbFetch(`/movie/${movieId}/external_ids`);
+}
+
+export async function fetchMovieReleaseDates(movieId) {
+  if (!movieId) throw new Error("movieId is required");
+  return tmdbFetch(`/movie/${movieId}/release_dates`);
+}
+
 export async function fetchMovieCredits(movieId) {
   if (!movieId) throw new Error("movieId is required");
   return tmdbFetch(`/movie/${movieId}/credits`);
@@ -93,6 +103,15 @@ export async function fetchMovieWatchProviders(movieId) {
 export async function fetchMovieVideos(movieId) {
   if (!movieId) throw new Error("movieId is required");
   return tmdbFetch(`/movie/${movieId}/videos`);
+}
+
+export async function fetchMovieTrailer(movieId) {
+  if (!movieId) throw new Error("movieId is required");
+  const data = await fetchMovieVideos(movieId);
+  const trailer = data.results?.find(
+    (v) => v.type === "Trailer" && v.site === "YouTube"
+  );
+  return trailer || null;
 }
 
 export async function fetchGenres() {
