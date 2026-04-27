@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions } from
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMovieTrailer, fetchMovieReleaseDates } from "../services/tmdb";
-import { addPick, getPicks, subscribePicks } from "../api/picksApi";
+import { addPick, getPicks, subscribePicks, subscribeWatched, getWatchedPicks, toggleWatched } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -24,6 +24,7 @@ export function MovieDetailsScreen({ route, navigation }) {
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
+  const [isWatched, setIsWatched] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -60,19 +61,40 @@ export function MovieDetailsScreen({ route, navigation }) {
     }
   }, [movieId]);
 
+  const checkWatched = useCallback(async () => {
+    try {
+      const watched = await getWatchedPicks();
+      const found = watched.find(p => Number(p.tmdb_id) === Number(movieId));
+      setIsWatched(!!found);
+    } catch (err) {
+      console.warn("Failed to check watched:", err.message);
+    }
+  }, [movieId]);
+
   useEffect(() => {
     checkFavorite();
+    checkWatched();
+  }, [checkFavorite, checkWatched]);
+
+  useEffect(() => {
+    const unsubscribePicks = subscribePicks(() => {
+      checkFavorite();
+    });
+    return unsubscribePicks;
   }, [checkFavorite]);
 
   useEffect(() => {
-    const unsubscribe = subscribePicks(() => {
-      checkFavorite();
+    const unsubscribeWatched = subscribeWatched(() => {
+      checkWatched();
     });
-    return unsubscribe;
-  }, [checkFavorite]);
+    return unsubscribeWatched;
+  }, [checkWatched]);
 
   const handleToggleFavorite = async () => {
     if (!movie) return;
+    const previousState = isFavorite;
+    const previousId = favoriteId;
+    setIsFavorite(!isFavorite);
     try {
       if (isFavorite) {
         await addPick({
@@ -91,8 +113,42 @@ export function MovieDetailsScreen({ route, navigation }) {
           choice: "saved",
         });
       }
+      checkFavorite();
     } catch (err) {
+      setIsFavorite(previousState);
+      setFavoriteId(previousId);
       console.warn("Failed to toggle favorite:", err.message);
+    }
+  };
+
+  const handleToggleWatched = async () => {
+    const previousState = isWatched;
+    setIsWatched(!isWatched);
+    try {
+      if (!favoriteId && movie) {
+        await addPick({
+          tmdbId: movie.id,
+          title: movie.title,
+          posterPath: movie.poster_path,
+          rating: movie.vote_average,
+          choice: "saved",
+          notify: false,
+        });
+        const picks = await getPicks("saved");
+        const saved = picks.find(p => Number(p.tmdb_id) === Number(movieId));
+        if (saved) {
+          await toggleWatched(saved.id);
+        }
+        checkWatched();
+        return;
+      }
+      if (favoriteId) {
+        await toggleWatched(favoriteId);
+        checkWatched();
+      }
+    } catch (err) {
+      setIsWatched(previousState);
+      console.warn("Failed to toggle watched:", err.message);
     }
   };
 
@@ -178,13 +234,22 @@ export function MovieDetailsScreen({ route, navigation }) {
                 </View>
               );
             })()}
-            <Pressable onPress={handleToggleFavorite} style={styles.favoriteButton}>
-              <Ionicons
-                name={isFavorite ? "heart" : "heart-outline"}
-                size={24}
-                color={isFavorite ? "#ff6464" : "rgba(255,255,255,0.6)"}
-              />
-            </Pressable>
+            <View style={styles.actionButtons}>
+              <Pressable onPress={handleToggleFavorite} style={styles.favoriteButton}>
+                <Ionicons
+                  name={isFavorite ? "heart" : "heart-outline"}
+                  size={24}
+                  color={isFavorite ? "#ff6464" : "rgba(255,255,255,0.6)"}
+                />
+              </Pressable>
+              <Pressable onPress={handleToggleWatched} style={styles.watchedButton}>
+                <Ionicons
+                  name="eye"
+                  size={24}
+                  color={isWatched ? "#4ade80" : "rgba(255,255,255,0.6)"}
+                />
+              </Pressable>
+            </View>
             <Text style={styles.meta}>
               {movie.release_date?.split("-")[0] || "N/A"} · {movie.runtime} min
             </Text>
@@ -349,6 +414,13 @@ backButton: {
   },
   favoriteButton: {
     marginTop: 4,
+  },
+  watchedButton: {
+    marginTop: 4,
+    marginLeft: 12,
+  },
+  actionButtons: {
+    flexDirection: "row",
   },
   meta: {
     color: "rgba(255,255,255,0.6)",

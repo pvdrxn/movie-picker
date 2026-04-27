@@ -4,7 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from "r
 
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
-export function MovieCard({ movie, onPress }) {
+export function MovieCard({ movie, onPress, watched = false }) {
   const { width } = useWindowDimensions();
   const cardWidth = (width - 32) / 2 - 20;
 
@@ -28,6 +28,9 @@ export function MovieCard({ movie, onPress }) {
         )}
         <View style={styles.ratingBadge}>
           <Text style={styles.ratingText}>{rating}</Text>
+          {watched ? (
+            <Text style={styles.watchedIcon}>👁</Text>
+          ) : null}
         </View>
       </View>
       <View style={[styles.overlay, { width: cardWidth, height: 36 }]}>
@@ -68,11 +71,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
   },
   ratingText: {
     color: "#fff",
     fontSize: 11,
     fontWeight: "700",
+  },
+  watchedIcon: {
+    marginLeft: 2,
+    fontSize: 12,
+    lineHeight: 12,
   },
   overlay: {
     marginTop: 8,

@@ -10,6 +10,7 @@ import {
   fetchTopRatedMovies,
   fetchUpcomingMovies,
 } from "../services/tmdb";
+import { getWatchedPicks, subscribeWatched } from "../api/picksApi";
 
 const CATEGORIES = [
   { key: "popular", title: "Popular", fetchFn: fetchPopularMovies },
@@ -22,11 +23,21 @@ export function HomeScreen() {
   const { signOut } = useContext(AuthContext);
   const navigation = useNavigation();
   const [categoryData, setCategoryData] = useState({});
+  const [watchedIds, setWatchedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   const rotation = useRef(new Animated.Value(0)).current;
+
+  const fetchWatched = async () => {
+    try {
+      const watched = await getWatchedPicks();
+      setWatchedIds(new Set(watched.map(w => Number(w.tmdb_id))));
+    } catch (err) {
+      console.warn("Failed to fetch watched:", err.message);
+    }
+  };
 
   const fetchAllCategories = async () => {
     try {
@@ -50,6 +61,14 @@ export function HomeScreen() {
 
   useEffect(() => {
     fetchAllCategories();
+    fetchWatched();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeWatched(() => {
+      fetchWatched();
+    });
+    return unsubscribe;
   }, []);
 
   const handleRefresh = () => {
@@ -120,7 +139,7 @@ export function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item }) => (
-                    <MovieCard movie={item} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+                    <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
                   )}
                   contentContainerStyle={styles.sectionList}
                 />

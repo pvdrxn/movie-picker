@@ -17,6 +17,7 @@ class PickedMovie(models.Model):
     poster_path = models.URLField(max_length=500, null=True, blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=1, default=0.0)
     choice = models.CharField(max_length=10, choices=CHOICES)
+    watched = models.BooleanField(default=False)
     picked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -37,6 +37,20 @@ class PickedMovieViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'])
+    def watched(self, request):
+        queryset = self.get_queryset().filter(watched=True)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def toggle_watched(self, request, pk=None):
+        movie = self.get_object()
+        movie.watched = not movie.watched
+        movie.save()
+        serializer = self.get_serializer(movie)
+        return Response(serializer.data)
+
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]

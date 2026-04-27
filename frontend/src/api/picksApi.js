@@ -1,20 +1,33 @@
 import { http } from "./http";
 
-const listeners = [];
+const pickListeners = [];
+const watchedListeners = [];
 
 export function subscribePicks(callback) {
-  listeners.push(callback);
+  pickListeners.push(callback);
   return () => {
-    const idx = listeners.indexOf(callback);
-    if (idx > -1) listeners.splice(idx, 1);
+    const idx = pickListeners.indexOf(callback);
+    if (idx > -1) pickListeners.splice(idx, 1);
   };
 }
 
-function notifyListeners() {
-  listeners.forEach(cb => cb());
+export function subscribeWatched(callback) {
+  watchedListeners.push(callback);
+  return () => {
+    const idx = watchedListeners.indexOf(callback);
+    if (idx > -1) watchedListeners.splice(idx, 1);
+  };
 }
 
-export async function addPick({ tmdbId, title, posterPath, rating, choice }) {
+function notifyPickListeners() {
+  pickListeners.forEach(cb => cb());
+}
+
+function notifyWatchedListeners() {
+  watchedListeners.forEach(cb => cb());
+}
+
+export async function addPick({ tmdbId, title, posterPath, rating, choice, notify = true }) {
   const payload = {
     tmdb_id: tmdbId,
     title,
@@ -27,7 +40,9 @@ export async function addPick({ tmdbId, title, posterPath, rating, choice }) {
     payload.rating = parseFloat(rating.toFixed(1));
   }
   const { data } = await http.post("/api/picks/", payload);
-  notifyListeners();
+  if (notify) {
+    notifyPickListeners();
+  }
   return data;
 }
 
@@ -39,5 +54,17 @@ export async function getPicks(choice = null) {
 
 export async function deletePick(id) {
   const { data } = await http.delete(`/api/picks/${id}/`);
+  notifyPickListeners();
+  return data;
+}
+
+export async function toggleWatched(id) {
+  const { data } = await http.post(`/api/picks/${id}/toggle_watched/`);
+  notifyWatchedListeners();
+  return data;
+}
+
+export async function getWatchedPicks() {
+  const { data } = await http.get("/api/picks/watched/");
   return data;
 }

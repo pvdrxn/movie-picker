@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
-import { getPicks, subscribePicks } from "../api/picksApi";
+import { getPicks, subscribePicks, subscribeWatched, getWatchedPicks } from "../api/picksApi";
 
 export function FavoritesScreen() {
   const navigation = useNavigation();
@@ -13,8 +13,16 @@ export function FavoritesScreen() {
 
   const fetchFavorites = useCallback(async () => {
     try {
-      const data = await getPicks("saved");
-      setFavorites(data);
+      const [data, watchedData] = await Promise.all([
+        getPicks("saved"),
+        getWatchedPicks()
+      ]);
+      const watchedIds = new Set(watchedData.map(w => Number(w.tmdb_id)));
+      const favoritesWithWatched = data.map(fav => ({
+        ...fav,
+        watched: watchedIds.has(Number(fav.tmdb_id))
+      }));
+      setFavorites(favoritesWithWatched);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -29,10 +37,16 @@ export function FavoritesScreen() {
   }, [fetchFavorites]);
 
   useEffect(() => {
-    const unsubscribe = subscribePicks(() => {
+    const unsubscribePicks = subscribePicks(() => {
       fetchFavorites();
     });
-    return unsubscribe;
+    const unsubscribeWatched = subscribeWatched(() => {
+      fetchFavorites();
+    });
+    return () => {
+      unsubscribePicks();
+      unsubscribeWatched();
+    };
   }, [fetchFavorites]);
 
   const handleRefresh = () => {
@@ -100,6 +114,7 @@ export function FavoritesScreen() {
                   poster_path: item.poster_path,
                   vote_average: item.rating,
                 }}
+                watched={item.watched}
                 onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })}
               />
             </View>

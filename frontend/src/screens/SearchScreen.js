@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TextInput, Pressable, ScrollView, use
 import { fetchGenres, fetchPopularMovies, searchMovies, discoverMovies } from "../services/tmdb";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
+import { getWatchedPicks, subscribeWatched } from "../api/picksApi";
 
 export function SearchScreen() {
   const navigation = useNavigation();
@@ -15,8 +16,26 @@ export function SearchScreen() {
   const [endYear, setEndYear] = useState("");
   const [minRating, setMinRating] = useState("");
   const [movies, setMovies] = useState([]);
+  const [watchedIds, setWatchedIds] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  const fetchWatched = async () => {
+    try {
+      const watched = await getWatchedPicks();
+      setWatchedIds(new Set(watched.map(w => Number(w.tmdb_id))));
+    } catch (err) {
+      console.warn("Failed to fetch watched:", err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchWatched();
+    const unsubscribe = subscribeWatched(() => {
+      fetchWatched();
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     fetchGenres().then((data) => setGenres(data.genres || [])).catch(console.error);
@@ -149,7 +168,7 @@ export function SearchScreen() {
             ListHeaderComponent={<View style={{ height: 4 }} />}
             renderItem={({ item }) => (
               <View style={styles.movieItem}>
-                <MovieCard movie={item} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+                <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
               </View>
             )}
             contentContainerStyle={{ paddingHorizontal: columnPadding, paddingBottom: 24, paddingRight: 8 }}
