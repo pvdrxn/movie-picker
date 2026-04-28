@@ -4,6 +4,7 @@ import { fetchPopularMovies } from "../services/tmdb";
 import { addPick } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const SWIPE_THRESHOLD = 50;
 
 export function PickScreen() {
   const [movies, setMovies] = useState([]);
@@ -12,90 +13,150 @@ export function PickScreen() {
   const [error, setError] = useState(null);
   const [savedCount, setSavedCount] = useState(0);
   const [passCount, setPassCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const startX = useRef(0);
+  const startY = useRef(0);
+
+  const loadMovies = async (reset = false) => {
+    try {
+      const data = await fetchPopularMovies({ page: reset ? 1 : page });
+      if (reset) {
+        setMovies(data.results || []);
+        setPage(2);
+      } else {
+        setMovies((prev) => [...prev, ...(data.results || [])]);
+        setPage((p) => p + 1);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchPopularMovies()
-      .then((data) => {
-        setMovies(data.results || []);
-      })
-      .catch((err) => {
-        setError(err.message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    loadMovies(true);
   }, []);
 
-  const handleSwipe = async (direction) => {
-    const movie = movies[currentIndex];
-    if (!movie) return;
+  const handleSwipeComplete = async (direction, movieToSave) => {
+    console.log("=== handleSwipeComplete ===");
+    console.log("direction:", direction);
+    console.log("movieToSave:", movieToSave?.title, "id:", movieToSave?.id);
+    
+    if (!movieToSave) {
+      setIsAnimating(false);
+      return;
+    }
 
-    const targetX = direction === "right" ? SCREEN_WIDTH : -SCREEN_WIDTH;
     const choice = direction === "right" ? "saved" : "pass";
+    console.log("Adding pick:", movieToSave.id, movieToSave.title, choice);
 
     try {
       await addPick({
-        tmdbId: movie.id,
-        title: movie.title,
-        posterPath: movie.poster_path,
-        rating: movie.vote_average,
+        tmdbId: movieToSave.id,
+        title: movieToSave.title,
+        posterPath: movieToSave.poster_path,
+        rating: movieToSave.vote_average,
         choice,
       });
+      console.log("Pick added OK");
     } catch (err) {
       console.warn("Failed to save pick:", err.message);
     }
 
-    Animated.timing(translateX, {
-      toValue: targetX,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      if (direction === "right") {
-        setSavedCount(c => c + 1);
-      } else {
-        setPassCount(c => c + 1);
-      }
-      setCurrentIndex(c => c + 1);
-      translateX.setValue(0);
-    });
+    if (direction === "right") {
+      setSavedCount((c) => c + 1);
+    } else {
+      setPassCount((c) => c + 1);
+    }
+
+    const newIndex = currentIndex + 1;
+    setCurrentIndex(newIndex);
+    translateX.setValue(0);
+    translateY.setValue(0);
+    setIsAnimating(false);
+
+    console.log("=== done ===");
   };
 
-  const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+  const animateSwipe = (direction) => {
+    const currentMovie = movies[currentIndex];
+    if (!currentMovie || isAnimating) return;
+    
+    setIsAnimating(true);
+
+    const targetX = direction === "right" ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
+    const targetY = direction === "right" ? 50 : -50;
+
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: targetX,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: targetY,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      handleSwipeComplete(direction, currentMovie);
+    });
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startX.current = translateX._value;
+        startY.current = translateY._value;
+      },
       onPanResponderMove: (_, gestureState) => {
-        translateX.setValue(gestureState.dx);
+        translateX.setValue(startX.current + gestureState.dx);
+        translateY.setValue(startY.current + gestureState.dy);
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 50) {
-          handleSwipe("right");
-        } else if (gestureState.dx < -50) {
-          handleSwipe("left");
+        if (gestureState.dx > SWIPE_THRESHOLD) {
+          animateSwipe("right");
+        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
+          animateSwipe("left");
         } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+            }),
+            Animated.spring(translateY, {
+              toValue: 0,
+              useNativeDriver: true,
+            }),
+          ]).start();
         }
       },
     })
   ).current;
 
+  const cardRotation = translateX.interpolate({
+    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    outputRange: ["-15deg", "0deg", "15deg"],
+    extrapolate: "clamp",
+  });
+
   const opacity = translateX.interpolate({
     inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
     outputRange: [0.5, 1, 0.5],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   const scale = translateX.interpolate({
     inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-    outputRange: [0.85, 1, 0.85],
-    extrapolate: 'clamp',
+    outputRange: [0.9, 1, 0.9],
+    extrapolate: "clamp",
   });
 
   if (loading) {
@@ -135,6 +196,10 @@ export function PickScreen() {
               setCurrentIndex(0);
               setSavedCount(0);
               setPassCount(0);
+              setPage(1);
+              translateX.setValue(0);
+              translateY.setValue(0);
+              loadMovies(true);
             }}
             style={styles.resetButton}
           >
@@ -146,7 +211,15 @@ export function PickScreen() {
           <Animated.View
             style={[
               styles.card,
-              { transform: [{ translateX }, { scale }], opacity },
+              {
+                transform: [
+                  { translateX },
+                  { translateY },
+                  { rotate: cardRotation },
+                  { scale },
+                ],
+                opacity,
+              },
             ]}
           >
             {currentMovie.poster_path ? (
@@ -171,16 +244,16 @@ export function PickScreen() {
         </View>
       )}
 
-      {currentMovie && (
+      {currentMovie && !isAnimating && (
         <View style={styles.buttons}>
           <Pressable
-            onPress={() => handleSwipe("left")}
+            onPress={() => animateSwipe("left")}
             style={[styles.button, styles.passButton]}
           >
             <Text style={styles.buttonText}>✕</Text>
           </Pressable>
           <Pressable
-            onPress={() => handleSwipe("right")}
+            onPress={() => animateSwipe("right")}
             style={[styles.button, styles.wantButton]}
           >
             <Text style={styles.buttonText}>♥</Text>
