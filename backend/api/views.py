@@ -6,6 +6,7 @@ from .serializers import RegisterSerializer, PickedMovieSerializer
 
 class PickedMovieViewSet(viewsets.ModelViewSet):
     serializer_class = PickedMovieSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return PickedMovie.objects.filter(user=self.request.user)

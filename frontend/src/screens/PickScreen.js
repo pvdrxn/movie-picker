@@ -1,25 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, Image, StyleSheet, Dimensions, Pressable, Animated, PanResponder } from "react-native";
+import { View, Text, Image, StyleSheet, Dimensions, Pressable } from "react-native";
+import Swiper from "react-native-deck-swiper";
 import { fetchPopularMovies } from "../services/tmdb";
 import { addPick } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SWIPE_THRESHOLD = 50;
 
 export function PickScreen() {
   const [movies, setMovies] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [savedCount, setSavedCount] = useState(0);
   const [passCount, setPassCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const startX = useRef(0);
-  const startY = useRef(0);
+  const [cardIndex, setCardIndex] = useState(0);
+  const swiperRef = useRef(null);
 
   const loadMovies = async (reset = false) => {
     try {
@@ -27,6 +22,7 @@ export function PickScreen() {
       if (reset) {
         setMovies(data.results || []);
         setPage(2);
+        setCardIndex(0);
       } else {
         setMovies((prev) => [...prev, ...(data.results || [])]);
         setPage((p) => p + 1);
@@ -42,30 +38,22 @@ export function PickScreen() {
     loadMovies(true);
   }, []);
 
-  const handleSwipeComplete = async (direction, movieToSave) => {
-    console.log("=== handleSwipeComplete ===");
-    console.log("direction:", direction);
-    console.log("movieToSave:", movieToSave?.title, "id:", movieToSave?.id);
-    
-    if (!movieToSave) {
-      setIsAnimating(false);
-      return;
-    }
+  const handleSwiped = async (direction, cardIndex) => {
+    const movie = movies[cardIndex];
+    if (!movie) return;
 
     const choice = direction === "right" ? "saved" : "pass";
-    console.log("Adding pick:", movieToSave.id, movieToSave.title, choice);
 
     try {
       await addPick({
-        tmdbId: movieToSave.id,
-        title: movieToSave.title,
-        posterPath: movieToSave.poster_path,
-        rating: movieToSave.vote_average,
+        tmdbId: movie.id,
+        title: movie.title,
+        posterPath: movie.poster_path,
+        rating: movie.vote_average,
         choice,
       });
-      console.log("Pick added OK");
     } catch (err) {
-      console.warn("Failed to save pick:", err.message);
+      console.warn("Failed to save pick:", err);
     }
 
     if (direction === "right") {
@@ -73,91 +61,38 @@ export function PickScreen() {
     } else {
       setPassCount((c) => c + 1);
     }
-
-    const newIndex = currentIndex + 1;
-    setCurrentIndex(newIndex);
-    translateX.setValue(0);
-    translateY.setValue(0);
-    setIsAnimating(false);
-
-    console.log("=== done ===");
   };
 
-  const animateSwipe = (direction) => {
-    const currentMovie = movies[currentIndex];
-    if (!currentMovie || isAnimating) return;
-    
-    setIsAnimating(true);
-
-    const targetX = direction === "right" ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
-    const targetY = direction === "right" ? 50 : -50;
-
-    Animated.parallel([
-      Animated.timing(translateX, {
-        toValue: targetX,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: targetY,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      handleSwipeComplete(direction, currentMovie);
-    });
+  const handleSwipedAll = () => {
+    console.log("All cards swiped");
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        startX.current = translateX._value;
-        startY.current = translateY._value;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        translateX.setValue(startX.current + gestureState.dx);
-        translateY.setValue(startY.current + gestureState.dy);
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > SWIPE_THRESHOLD) {
-          animateSwipe("right");
-        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          animateSwipe("left");
-        } else {
-          Animated.parallel([
-            Animated.spring(translateX, {
-              toValue: 0,
-              useNativeDriver: true,
-            }),
-            Animated.spring(translateY, {
-              toValue: 0,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-      },
-    })
-  ).current;
+  const renderCard = (movie) => {
+    if (!movie) return null;
 
-  const cardRotation = translateX.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-    outputRange: ["-15deg", "0deg", "15deg"],
-    extrapolate: "clamp",
-  });
-
-  const opacity = translateX.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-    outputRange: [0.5, 1, 0.5],
-    extrapolate: "clamp",
-  });
-
-  const scale = translateX.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-    outputRange: [0.9, 1, 0.9],
-    extrapolate: "clamp",
-  });
+    return (
+      <View style={styles.card}>
+        {movie.poster_path ? (
+          <Image
+            source={{
+              uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+            }}
+            style={styles.cardImage}
+          />
+        ) : (
+          <View style={[styles.cardImage, styles.cardPlaceholder]}>
+            <Text style={styles.placeholderText}>No Image</Text>
+          </View>
+        )}
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardTitle}>{movie.title}</Text>
+          <Text style={styles.cardRating}>
+            ★ {movie.vote_average?.toFixed(1) || "N/A"}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -175,8 +110,7 @@ export function PickScreen() {
     );
   }
 
-  const currentMovie = movies[currentIndex];
-  const noMoreMovies = !currentMovie;
+  const noMoreMovies = cardIndex >= movies.length;
 
   return (
     <View style={styles.container}>
@@ -193,12 +127,10 @@ export function PickScreen() {
           </Text>
           <Pressable
             onPress={() => {
-              setCurrentIndex(0);
+              setCardIndex(0);
               setSavedCount(0);
               setPassCount(0);
               setPage(1);
-              translateX.setValue(0);
-              translateY.setValue(0);
               loadMovies(true);
             }}
             style={styles.resetButton}
@@ -207,53 +139,50 @@ export function PickScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={styles.cardContainer} {...panResponder.panHandlers}>
-          <Animated.View
-            style={[
-              styles.card,
-              {
-                transform: [
-                  { translateX },
-                  { translateY },
-                  { rotate: cardRotation },
-                  { scale },
-                ],
-                opacity,
-              },
-            ]}
-          >
-            {currentMovie.poster_path ? (
-              <Image
-                source={{
-                  uri: `https://image.tmdb.org/t/p/w500${currentMovie.poster_path}`,
-                }}
-                style={styles.cardImage}
-              />
-            ) : (
-              <View style={[styles.cardImage, styles.cardPlaceholder]}>
-                <Text style={styles.placeholderText}>No Image</Text>
-              </View>
-            )}
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardTitle}>{currentMovie.title}</Text>
-              <Text style={styles.cardRating}>
-                ★ {currentMovie.vote_average?.toFixed(1) || "N/A"}
-              </Text>
-            </View>
-          </Animated.View>
+        <View style={styles.swiperContainer}>
+          <Swiper
+            ref={swiperRef}
+            cards={movies}
+            renderCard={renderCard}
+            keyExtractor={(item) => item.id.toString()}
+            onSwipedLeft={(index, movie) => {
+              setCardIndex(index + 1);
+              handleSwiped("left", index);
+            }}
+            onSwipedRight={(index, movie) => {
+              setCardIndex(index + 1);
+              handleSwiped("right", index);
+            }}
+            onSwipedAll={handleSwipedAll}
+            cardIndex={cardIndex}
+            infinite={false}
+            horizontalSwipe={true}
+            verticalSwipe={false}
+            showSecondCard={true}
+            stackSize={1}
+            stackScale={5}
+            stackSeparation={10}
+            swipeThreshold={30}
+            backgroundColor="transparent"
+            cardStyle={{
+              width: SCREEN_WIDTH - 48,
+              height: (SCREEN_WIDTH - 48) * 1.5,
+            }}
+            containerStyle={styles.swiperInner}
+          />
         </View>
       )}
 
-      {currentMovie && !isAnimating && (
+      {movies.length > 0 && cardIndex < movies.length && (
         <View style={styles.buttons}>
           <Pressable
-            onPress={() => animateSwipe("left")}
+            onPress={() => swiperRef.current?.swipeLeft()}
             style={[styles.button, styles.passButton]}
           >
             <Text style={styles.buttonText}>✕</Text>
           </Pressable>
           <Pressable
-            onPress={() => animateSwipe("right")}
+            onPress={() => swiperRef.current?.swipeRight()}
             style={[styles.button, styles.wantButton]}
           >
             <Text style={styles.buttonText}>♥</Text>
@@ -291,12 +220,14 @@ const styles = StyleSheet.create({
     color: "#ff6b6b",
     fontSize: 16,
   },
-  cardContainer: {
+  swiperContainer: {
     flex: 1,
     width: SCREEN_WIDTH,
-    justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
+  },
+  swiperInner: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   card: {
     width: SCREEN_WIDTH - 48,
