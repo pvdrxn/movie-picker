@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, Text, Image, StyleSheet, Dimensions, Pressable } from "react-native";
 import Swiper from "react-native-deck-swiper";
 import { fetchPopularMovies } from "../services/tmdb";
-import { addPick } from "../api/picksApi";
+import { addPick, getPicks } from "../api/picksApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -14,17 +14,20 @@ export function PickScreen() {
   const [passCount, setPassCount] = useState(0);
   const [page, setPage] = useState(1);
   const [cardIndex, setCardIndex] = useState(0);
+  const [pickedIds, setPickedIds] = useState(new Set());
+  const pickedIdsRef = useRef(new Set());
   const swiperRef = useRef(null);
 
   const loadMovies = async (reset = false) => {
     try {
       const data = await fetchPopularMovies({ page: reset ? 1 : page });
+      const newMovies = (data.results || []).filter(m => !pickedIdsRef.current.has(m.id));
       if (reset) {
-        setMovies(data.results || []);
+        setMovies(newMovies);
         setPage(2);
         setCardIndex(0);
       } else {
-        setMovies((prev) => [...prev, ...(data.results || [])]);
+        setMovies((prev) => [...prev, ...newMovies]);
         setPage((p) => p + 1);
       }
     } catch (err) {
@@ -35,8 +38,26 @@ export function PickScreen() {
   };
 
   useEffect(() => {
-    loadMovies(true);
+    async function loadPickedIds() {
+      try {
+        const picks = await getPicks();
+        const ids = new Set(picks.map(p => p.tmdb_id));
+        setPickedIds(ids);
+        pickedIdsRef.current = ids;
+        loadMovies(true);
+      } catch (err) {
+        console.warn("Failed to load picks:", err);
+        loadMovies(true);
+      }
+    }
+    loadPickedIds();
   }, []);
+
+  useEffect(() => {
+    if (cardIndex >= movies.length - 5 && !loading) {
+      loadMovies();
+    }
+  }, [cardIndex, movies.length, loading]);
 
   const handleSwiped = async (direction, cardIndex) => {
     const movie = movies[cardIndex];
@@ -61,6 +82,11 @@ export function PickScreen() {
     } else {
       setPassCount((c) => c + 1);
     }
+    setPickedIds(prev => {
+      const newSet = new Set([...prev, movie.id]);
+      pickedIdsRef.current = newSet;
+      return newSet;
+    });
   };
 
   const handleSwipedAll = () => {
