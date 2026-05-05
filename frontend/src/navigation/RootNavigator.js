@@ -10,7 +10,8 @@ import { PickScreen } from "../screens/PickScreen";
 import { SearchScreen } from "../screens/SearchScreen";
 import { FavoritesScreen } from "../screens/FavoritesScreen";
 import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
-import { ActivityIndicator, View, Text } from "react-native";
+import { ActivityIndicator, View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -23,35 +24,95 @@ function Splash() {
   );
 }
 
+function CustomTabBar({ state, descriptors, navigation }) {
+  return (
+    <View style={styles.outerContainer}>
+      <View style={styles.shadowContainer} />
+      <View style={styles.tabBar}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel ?? options.title ?? route.name;
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          const icons = {
+            Browse: "star-outline",
+            Search: "search-outline",
+            Favorites: "bookmark-outline",
+            Pick: "swap-horizontal-outline",
+          };
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={styles.tabItem}
+            >
+              <Ionicons
+                name={icons[route.name]}
+                size={24}
+                color={isFocused ? "#000" : "rgba(0,0,0,0.5)"}
+              />
+              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function MoviesTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: "#0B1220", borderTopColor: "rgba(255,255,255,0.12)" },
-        tabBarActiveTintColor: "#fff",
-        tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
       }}
+      tabBar={(props) => <CustomTabBar {...props} />}
     >
       <Tab.Screen
         name="Browse"
         component={HomeScreen}
-        options={{ tabBarLabel: "Browse" }}
+        options={{
+          tabBarLabel: "Browse",
+          tabBarIcon: () => <Ionicons name="star-outline" size={24} color="#000" />,
+        }}
       />
       <Tab.Screen
         name="Search"
         component={SearchScreen}
-        options={{ tabBarLabel: "Search" }}
+        options={{
+          tabBarLabel: "Search",
+          tabBarIcon: () => <Ionicons name="search-outline" size={24} color="#000" />,
+        }}
       />
       <Tab.Screen
         name="Favorites"
         component={FavoritesScreen}
-        options={{ tabBarLabel: "Favorites" }}
+        options={{
+          tabBarLabel: "Favorites",
+          tabBarIcon: () => <Ionicons name="bookmark-outline" size={24} color="#000" />,
+        }}
       />
       <Tab.Screen
         name="Pick"
         component={PickScreen}
-        options={{ tabBarLabel: "Pick" }}
+        options={{
+          tabBarLabel: "Pick",
+          tabBarIcon: () => <Ionicons name="swap-horizontal-outline" size={24} color="#000" />,
+        }}
       />
     </Tab.Navigator>
   );
@@ -59,14 +120,16 @@ function MoviesTabs() {
 
 function AppStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MoviesTabs" component={MoviesTabs} />
-      <Stack.Screen
-        name="MovieDetails"
-        component={MovieDetailsScreen}
-        options={{ presentation: "modal", animation: "slide_from_bottom" }}
-      />
-    </Stack.Navigator>
+    <View style={{ flex: 1, backgroundColor: "#0B1220" }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="MoviesTabs" component={MoviesTabs} />
+        <Stack.Screen
+          name="MovieDetails"
+          component={MovieDetailsScreen}
+          options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        />
+      </Stack.Navigator>
+    </View>
   );
 }
 
@@ -91,3 +154,55 @@ export function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+outerContainer: {
+    position: "absolute",
+    bottom: 24,
+    left: 0,
+    right: 0,
+    width: "100%",
+    height: 80,
+  },
+shadowContainer: {
+    position: "absolute",
+    bottom: -125,
+    width: "160%",
+    left: "-25%",
+    height: 100,
+    boxShadow: [
+      { offsetX: 0, offsetY: -30, blurRadius: 80, color: "rgba(0, 0, 0, 0.75)" },
+      { offsetX: 0, offsetY: -30, blurRadius: 80, color: "rgba(0, 0, 0, 0.75)" },
+      { offsetX: 0, offsetY: -30, blurRadius: 80, color: "rgba(0, 0, 0, 0.75)" },
+    ],
+    elevation: 10,
+  },
+  tabBar: {
+    position: "absolute",
+    bottom: 0,
+    left: "2.5%",
+    width: "95%",
+    height: 80,
+    backgroundColor: "#F3EDF7",
+    borderRadius: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingBottom: 12,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 8,
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "rgba(0,0,0,0.5)",
+    marginTop: 4,
+  },
+  tabLabelActive: {
+    color: "#000",
+  },
+});
