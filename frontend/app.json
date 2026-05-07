@@ -27,10 +27,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-video",
-      "expo-web-browser",
-      "expo-image"
-    ]
+    
   }
 }

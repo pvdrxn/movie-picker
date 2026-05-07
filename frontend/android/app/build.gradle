@@ -92,6 +92,7 @@ android {
         applicationId 'com.anonymous.moviepicker'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        ndkVersion "30.0.14904198"
         versionCode 1
         versionName "1.0.0"
 
