@@ -36,6 +36,7 @@ export function HomeScreen() {
       setWatchedIds(new Set(watched.map(w => Number(w.tmdb_id))));
     } catch (err) {
       console.warn("Failed to fetch watched:", err.message);
+      setError(err.message);
     }
   };
 
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "#000000",
   },
   signOutButton: {
     position: "absolute",
@@ -167,8 +168,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 8,
   },
-  signOutText: {
-    color: "rgba(255,255,255,0.6)",
+signOutText: {
+    color: "#B5B5B5",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -178,12 +179,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    color: "rgba(255,255,255,0.5)",
+    color: "#B5B5B5",
     fontSize: 32,
     marginBottom: 8,
   },
   statusText: {
-    color: "rgba(255,255,255,0.5)",
+    color: "#B5B5B5",
     fontSize: 16,
   },
   error: {
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: {
-    color: "#fff",
+    color: "#B5B5B5",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: "#fff",
+    color: "#B5B5B5",
     fontSize: 18,
     fontWeight: "700",
     paddingHorizontal: 20,

@@ -5,7 +5,8 @@ function getTmdbApiKey() {
     process.env.EXPO_PUBLIC_TMDB_API_KEY ||
     process.env.EXPO_PUBLIC_API_KEY ||
     process.env.TMDB_API_KEY ||
-    process.env.API_KEY
+    process.env.API_KEY ||
+    "9a6ee041700647dbb61419c09c604c93"
   );
 }
 

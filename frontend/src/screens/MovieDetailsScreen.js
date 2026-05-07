@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions } from "react-native";
+import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions, RefreshControl } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMovieTrailer, fetchMovieReleaseDates } from "../services/tmdb";
@@ -15,12 +15,7 @@ export function MovieDetailsScreen({ route, navigation }) {
   const [trailer, setTrailer] = useState(null);
   const [releaseDates, setReleaseDates] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const handlePlayTrailer = async () => {
-    if (trailer?.key) {
-      await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
-    }
-  };
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
@@ -89,6 +84,33 @@ export function MovieDetailsScreen({ route, navigation }) {
     });
     return unsubscribeWatched;
   }, [checkWatched]);
+
+  const handlePlayTrailer = async () => {
+    if (trailer?.key) {
+      await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
+    }
+  };
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([
+      fetchMovieDetails(movieId),
+      fetchMovieCredits(movieId),
+      fetchMovieWatchProviders(movieId),
+      fetchMovieTrailer(movieId),
+      fetchMovieReleaseDates(movieId),
+    ])
+      .then(([details, creditsData, providersData, trailerData, releaseData]) => {
+        setMovie(details);
+        setCredits(creditsData);
+        setWatchProviders(providersData);
+        setTrailer(trailerData);
+        setReleaseDates(releaseData);
+        setError(null);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setRefreshing(false));
+  }, [movieId]);
 
   const handleToggleFavorite = async () => {
     if (!movie) return;
@@ -199,7 +221,17 @@ export function MovieDetailsScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#fff"
+            colors={["#fff"]}
+          />
+        }
+      >
         <View style={styles.topBar}>
           <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={24} color="#fff" />
@@ -357,7 +389,7 @@ export function MovieDetailsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "#000000",
   },
 scrollView: {
     flex: 1,

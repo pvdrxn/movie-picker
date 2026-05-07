@@ -21,14 +21,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.anonymous.moviepicker"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-video",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-image"
     ]
   }
 }

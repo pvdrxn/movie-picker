@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, ScrollView, RefreshControl, useWindowDimensions } from "react-native";
 import { fetchGenres, fetchPopularMovies, searchMovies, discoverMovies } from "../services/tmdb";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
@@ -19,6 +19,7 @@ export function SearchScreen() {
   const [watchedIds, setWatchedIds] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchWatched = async () => {
     try {
@@ -86,6 +87,17 @@ export function SearchScreen() {
     setSelectedGenre(genreId === selectedGenre ? null : genreId);
     setQuery("");
   };
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([
+      fetchGenres().then((data) => setGenres(data.genres || [])),
+      fetchWatched(),
+      query ? searchMovies(query).then((data) => setMovies(data.results || [])) : fetchPopularMovies().then((data) => setMovies(data.results || []))
+    ])
+      .catch(console.error)
+      .finally(() => setRefreshing(false));
+  }, [query]);
 
   return (
     <View style={styles.container}>
@@ -166,6 +178,14 @@ export function SearchScreen() {
             numColumns={2}
             keyExtractor={(item) => item.id.toString()}
             ListHeaderComponent={<View style={{ height: 4 }} />}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#fff"
+                colors={["#fff"]}
+              />
+            }
             renderItem={({ item }) => (
               <View style={styles.movieItem}>
                 <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
@@ -182,7 +202,7 @@ export function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "#000000",
     paddingTop: 50,
   },
   header: {
@@ -190,7 +210,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    color: "#fff",
+    color: "#B5B5B5",
     fontSize: 28,
     fontWeight: "800",
     marginBottom: 12,

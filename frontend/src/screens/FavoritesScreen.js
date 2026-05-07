@@ -129,7 +129,7 @@ export function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "#000000",
     paddingTop: 50,
   },
   header: {
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    color: "#fff",
+    color: "#B5B5B5",
     fontSize: 28,
     fontWeight: "800",
   },

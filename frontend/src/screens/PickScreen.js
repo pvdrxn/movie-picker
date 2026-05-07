@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { View, Text, Image, StyleSheet, Dimensions, Pressable } from "react-native";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { View, Text, Image, StyleSheet, Dimensions, Pressable, ScrollView, RefreshControl } from "react-native";
 import Swiper from "react-native-deck-swiper";
 import { fetchPopularMovies } from "../services/tmdb";
 import { addPick, getPicks } from "../api/picksApi";
@@ -15,6 +15,7 @@ export function PickScreen() {
   const [page, setPage] = useState(1);
   const [cardIndex, setCardIndex] = useState(0);
   const [pickedIds, setPickedIds] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
   const pickedIdsRef = useRef(new Set());
   const swiperRef = useRef(null);
 
@@ -93,6 +94,15 @@ export function PickScreen() {
     console.log("All cards swiped");
   };
 
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setCardIndex(0);
+    setSavedCount(0);
+    setPassCount(0);
+    setPage(1);
+    loadMovies(true).finally(() => setRefreshing(false));
+  }, []);
+
   const renderCard = (movie) => {
     if (!movie) return null;
 
@@ -139,7 +149,18 @@ export function PickScreen() {
   const noMoreMovies = cardIndex >= movies.length;
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor="#fff"
+          colors={["#fff"]}
+        />
+      }
+    >
       <Text style={styles.title}>Pick Movies</Text>
       <Text style={styles.subtitle}>
         Swipe right to save · Swipe left to pass
@@ -198,43 +219,29 @@ export function PickScreen() {
           />
         </View>
       )}
+      </ScrollView>
+    );
+  }
 
-      {movies.length > 0 && cardIndex < movies.length && (
-        <View style={styles.buttons}>
-          <Pressable
-            onPress={() => swiperRef.current?.swipeLeft()}
-            style={[styles.button, styles.passButton]}
-          >
-            <Text style={styles.buttonText}>✕</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => swiperRef.current?.swipeRight()}
-            style={[styles.button, styles.wantButton]}
-          >
-            <Text style={styles.buttonText}>♥</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0B1220",
-    alignItems: "center",
-    paddingTop: 60,
-    paddingHorizontal: 0,
-  },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#000000",
+    },
+    scrollContent: {
+      alignItems: "center",
+      paddingTop: 60,
+      paddingHorizontal: 0,
+      paddingBottom: 24,
+    },
   title: {
-    color: "#fff",
+    color: "#B5B5B5",
     fontSize: 28,
     fontWeight: "800",
     marginBottom: 4,
   },
   subtitle: {
-    color: "rgba(255,255,255,0.5)",
+    color: "#B5B5B5",
     fontSize: 14,
     marginBottom: 24,
   },
@@ -259,15 +266,15 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH - 48,
     height: (SCREEN_WIDTH - 48) * 1.5,
     borderRadius: 16,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#ffffff",
+    overflow: "hidden",
+    borderWidth: 6,
+    borderColor: "#ffffff",
   },
   cardImage: {
     width: "100%",
     height: "85%",
     resizeMode: "cover",
-    overflow: "hidden",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
   },
   cardPlaceholder: {
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -284,41 +291,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   cardTitle: {
-    color: "#fff",
+    color: "#B5B5B5",
     fontSize: 20,
     fontWeight: "700",
   },
   cardRating: {
-    color: "#fbbf24",
+    color: "#B5B5B5",
     fontSize: 16,
     fontWeight: "600",
-  },
-  buttons: {
-    flexDirection: "row",
-    marginBottom: 32,
-    gap: 16,
-  },
-  button: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 30,
-    minWidth: 100,
-    alignItems: "center",
-  },
-  passButton: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 2,
-    borderColor: "rgba(255,100,100,0.5)",
-  },
-  wantButton: {
-    backgroundColor: "rgba(255,100,100,0.2)",
-    borderWidth: 2,
-    borderColor: "#ff6464",
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
   },
   doneContainer: {
     flex: 1,
