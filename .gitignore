@@ -42,6 +42,9 @@ yarn-error.log*
 dist/
 web-build/
 
+# Android build cache
+**/.cxx/
+
 # IDE/System
 .vscode/
 .idea/
