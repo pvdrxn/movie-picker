@@ -10,6 +10,7 @@ import { PickScreen } from "../screens/PickScreen";
 import { SearchScreen } from "../screens/SearchScreen";
 import { FavoritesScreen } from "../screens/FavoritesScreen";
 import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
+import { colors } from "../theme";
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, View, Text, Animated, Pressable } from "react-native";
 
@@ -18,7 +19,7 @@ const Tab = createBottomTabNavigator();
 
 function Splash() {
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B1220" }}>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg.primary }}>
       <ActivityIndicator />
     </View>
   );
@@ -52,7 +53,7 @@ function MoviesTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: "#242424",
           position: "absolute",
           bottom: 20,
           left: 20,
@@ -68,8 +69,8 @@ function MoviesTabs() {
           paddingTop: 8,
           height: 65,
         },
-        tabBarActiveTintColor: "#00D4FF",
-        tabBarInactiveTintColor: "rgba(0,0,0,0.4)",
+        tabBarActiveTintColor: colors.text.primary,
+        tabBarInactiveTintColor: colors.text.tertiary,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === "Browse") {
@@ -134,7 +135,7 @@ export function RootNavigator() {
       ) : (
         <Stack.Navigator
           initialRouteName="Login"
-          screenOptions={{ headerStyle: { backgroundColor: "#0B1220" }, headerTintColor: "#fff" }}
+          screenOptions={{ headerStyle: { backgroundColor: colors.bg.primary }, headerTintColor: colors.text.primary }}
         >
           <Stack.Screen name="Login" component={LoginScreen} options={{ title: "Log in" }} />
           <Stack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />

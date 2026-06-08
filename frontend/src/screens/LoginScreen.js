@@ -1,6 +1,7 @@
 import React, { useContext, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AuthContext } from "../auth/AuthContext";
+import { colors } from "../theme";
 
 export function LoginScreen({ navigation }) {
   const { signIn } = useContext(AuthContext);
@@ -75,48 +76,48 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: "center",
-    backgroundColor: "#0B1220",
+    backgroundColor: colors.bg.primary,
   },
   title: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 32,
     fontWeight: "700",
     marginBottom: 6,
   },
   subtitle: {
-    color: "rgba(255,255,255,0.75)",
+    color: colors.text.secondary,
     fontSize: 16,
     marginBottom: 24,
   },
   card: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: colors.bg.card,
+    borderColor: colors.bg.card,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
   },
   label: {
-    color: "rgba(255,255,255,0.85)",
+    color: colors.text.primary,
     fontSize: 13,
     marginTop: 10,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: colors.bg.elevated,
+    borderColor: colors.bg.elevated,
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    color: "#fff",
+    color: colors.text.primary,
   },
   error: {
-    color: "#FF6B6B",
+    color: colors.accentSecondary,
     marginTop: 10,
   },
   button: {
     marginTop: 16,
-    backgroundColor: "#4F46E5",
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontWeight: "700",
     fontSize: 16,
   },
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   linkText: {
-    color: "rgba(255,255,255,0.85)",
+    color: colors.text.secondary,
     fontSize: 14,
     textDecorationLine: "underline",
   },

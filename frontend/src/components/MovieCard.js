@@ -1,10 +1,12 @@
 import React from "react";
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { colors } from "../theme";
 
 
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
-export function MovieCard({ movie, onPress, watched = false }) {
+export function MovieCard({ movie, onPress, watched = false, showTitle = true }) {
   const { width } = useWindowDimensions();
   const cardWidth = (width - 32) / 2 - 20;
 
@@ -27,68 +29,65 @@ export function MovieCard({ movie, onPress, watched = false }) {
           </View>
         )}
         <View style={styles.ratingBadge}>
-          <Text style={styles.ratingText}>{rating}</Text>
+          <Text style={[styles.ratingText, { color: (movie.vote_average || 0) >= 8 ? colors.rating : colors.text.primary }]}>{rating}</Text>
           {watched ? (
-            <Text style={styles.watchedIcon}>👁</Text>
+            <Ionicons name="eye" size={16} color={colors.accent} style={{ marginLeft: 5 }} />
           ) : null}
         </View>
       </View>
-      <View style={[styles.overlay, { width: cardWidth, height: 36 }]}>
-        <Text style={styles.title} numberOfLines={2}>
-          {movie.title}
-        </Text>
-      </View>
+      {showTitle && (
+        <View style={[styles.overlay, { width: cardWidth, height: 36 }]}>
+          <Text style={styles.title} numberOfLines={2}>
+            {movie.title}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 10,
-    marginBottom: 8,
+    marginLeft: 6,
+    marginRight: 6,
+    marginBottom: 4,
   },
   posterContainer: {
     position: "relative",
   },
   poster: {
-    borderRadius: 12,
+    borderRadius: 4,
   },
   posterPlaceholder: {
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 4,
+    backgroundColor: colors.bg.elevated,
     justifyContent: "center",
     alignItems: "center",
   },
   placeholderText: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.text.tertiary,
     fontSize: 12,
   },
   ratingBadge: {
     position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "rgba(0,0,0,0.75)",
+    bottom: 4,
+    right: 4,
+    backgroundColor: colors.bg.overlay,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 2,
     flexDirection: "row",
     alignItems: "center",
   },
   ratingText: {
-    color: "#fff",
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: "700",
-  },
-  watchedIcon: {
-    marginLeft: 2,
-    fontSize: 12,
-    lineHeight: 12,
   },
   overlay: {
     marginTop: 8,
   },
   title: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 13,
     fontWeight: "500",
     lineHeight: 18,

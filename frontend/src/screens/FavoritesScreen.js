@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
 import { getPicks, subscribePicks, subscribeWatched, getWatchedPicks } from "../api/picksApi";
+import { colors } from "../theme";
 
 export function FavoritesScreen() {
   const navigation = useNavigation();
@@ -101,7 +102,7 @@ export function FavoritesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#fff"
+               tintColor={colors.text.primary}
               colors={["#fff"]}
             />
           }
@@ -129,7 +130,7 @@ export function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: colors.bg.primary,
     paddingTop: 50,
   },
   header: {
@@ -140,12 +141,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 28,
     fontWeight: "800",
   },
   count: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 14,
   },
   centered: {
@@ -154,21 +155,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 16,
   },
   errorText: {
-    color: "#ff6b6b",
+    color: colors.accentSecondary,
     fontSize: 16,
   },
   emptyText: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.text.secondary,
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 8,
   },
   emptySubtext: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.text.tertiary,
     fontSize: 14,
   },
   movieItem: {

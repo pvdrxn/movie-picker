@@ -4,6 +4,7 @@ import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMovieTrailer, fetchMovieReleaseDates } from "../services/tmdb";
 import { addPick, getPicks, subscribePicks, subscribeWatched, getWatchedPicks, toggleWatched } from "../api/picksApi";
+import { colors } from "../theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -202,7 +203,7 @@ export function MovieDetailsScreen({ route, navigation }) {
       <ScrollView style={styles.scrollView}>
         <View style={styles.topBar}>
           <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
           </Pressable>
         </View>
         <View style={styles.header}>
@@ -239,14 +240,14 @@ export function MovieDetailsScreen({ route, navigation }) {
                 <Ionicons
                   name={isFavorite ? "heart" : "heart-outline"}
                   size={24}
-                  color={isFavorite ? "#ff6464" : "rgba(255,255,255,0.6)"}
+                  color={isFavorite ? colors.favorite : colors.text.secondary}
                 />
               </Pressable>
               <Pressable onPress={handleToggleWatched} style={styles.watchedButton}>
                 <Ionicons
                   name="eye"
                   size={24}
-                  color={isWatched ? "#4ade80" : "rgba(255,255,255,0.6)"}
+                  color={isWatched ? colors.success : colors.text.secondary}
                 />
               </Pressable>
             </View>
@@ -292,7 +293,7 @@ export function MovieDetailsScreen({ route, navigation }) {
               style={styles.trailerButton}
               onPress={handlePlayTrailer}
             >
-              <Ionicons name="play-circle" size={40} color="#fff" />
+              <Ionicons name="play-circle" size={40} color={colors.text.primary} />
             </Pressable>
           </View>
         )}
@@ -357,9 +358,9 @@ export function MovieDetailsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: colors.bg.primary,
   },
-scrollView: {
+  scrollView: {
     flex: 1,
   },
   topBar: {
@@ -367,7 +368,7 @@ scrollView: {
     paddingTop: 25,
     paddingLeft: 3
   },
-backButton: {
+  backButton: {
     width: 45,
     height: 45,
     borderRadius: 45,
@@ -386,12 +387,12 @@ backButton: {
     borderRadius: 8,
   },
   posterPlaceholder: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.bg.elevated,
     justifyContent: "center",
     alignItems: "center",
   },
   posterInitials: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 32,
     fontWeight: "700",
   },
@@ -401,13 +402,13 @@ backButton: {
     justifyContent: "center",
   },
   title: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 22,
     fontWeight: "800",
     marginBottom: 4,
   },
   rating: {
-    color: "#fbbf24",
+    color: colors.rating,
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 4,
@@ -423,12 +424,12 @@ backButton: {
     flexDirection: "row",
   },
   meta: {
-    color: "rgba(255,255,255,0.6)",
+    color: colors.text.secondary,
     fontSize: 14,
     marginBottom: 8,
   },
   genres: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 12,
   },
   ratingsContainer: {
@@ -446,7 +447,7 @@ backButton: {
     marginTop: 4,
   },
   ratingBadgeText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 11,
     fontWeight: "600",
   },
@@ -455,7 +456,7 @@ backButton: {
     paddingTop: 8,
   },
   sectionTitle: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 12,
@@ -470,13 +471,13 @@ backButton: {
     marginBottom: 8,
   },
   directorText: {
-    color: "rgba(255,255,255,0.8)",
+    color: colors.text.secondary,
     fontSize: 14,
     textAlign: "center",
     width: 80,
   },
   synopsis: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.text.secondary,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -492,37 +493,37 @@ backButton: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.bg.elevated,
   },
   castPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
   },
   castInitials: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 24,
     fontWeight: "600",
   },
   castName: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 12,
     fontWeight: "600",
     marginTop: 6,
     textAlign: "center",
   },
   castCharacter: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 10,
     textAlign: "center",
   },
   loadingText: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 16,
     textAlign: "center",
     marginTop: 100,
   },
   errorText: {
-    color: "#ff6b6b",
+    color: colors.accentSecondary,
     fontSize: 16,
     textAlign: "center",
     marginTop: 100,
@@ -539,10 +540,10 @@ backButton: {
     width: 50,
     height: 50,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.bg.elevated,
   },
   providerName: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.text.secondary,
     fontSize: 10,
     textAlign: "center",
     marginTop: 4,
@@ -551,12 +552,12 @@ backButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#e50914",
+    backgroundColor: colors.accent,
     justifyContent: "center",
     alignItems: "center",
   },
   noProvidersText: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.text.tertiary,
     fontSize: 14,
     fontStyle: "italic",
   },

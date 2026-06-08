@@ -3,32 +3,11 @@ import { View, Text, Image, StyleSheet, Dimensions, Pressable, ScrollView, Anima
 import { LinearGradient } from "expo-linear-gradient";
 import { fetchPopularMovies, fetchGenres, fetchMovieCredits, fetchMovieDetails } from "../services/tmdb";
 import { addPick, getPicks } from "../api/picksApi";
+import { colors } from "../theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const SWIPE_THRESHOLD = 125;
-
-const GENRE_COLORS = {
-  Action: "#ff4444",
-  Adventure: "#ff8c00",
-  Animation: "#ffd700",
-  Comedy: "#e6b800",
-  Crime: "#9b59b6",
-  Documentary: "#1abc9c",
-  Drama: "#4488ff",
-  Family: "#ff69b4",
-  Fantasy: "#bb6bd9",
-  History: "#cd853f",
-  Horror: "#c0392b",
-  Music: "#00d4ff",
-  Mystery: "#7b68ee",
-  Romance: "#ff1493",
-  "Science Fiction": "#00d4ff",
-  "TV Movie": "#888888",
-  Thriller: "#8e44ad",
-  War: "#556b2f",
-  Western: "#d2b48c",
-};
 
 const CARD_WIDTH = SCREEN_WIDTH - 48;
 const CARD_HEIGHT = CARD_WIDTH * 1.5;
@@ -59,6 +38,8 @@ export function PickScreen() {
 
   const pan = useRef(new Animated.ValueXY()).current;
   const isSwiping = useRef(false);
+  const rightOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const leftOverlayOpacity = useRef(new Animated.Value(0)).current;
 
   const loadMovies = async (reset = false, replace = false) => {
     if (!reset && !replace && loadingRef.current) return;
@@ -176,10 +157,20 @@ export function PickScreen() {
   }, [cardIndex, movies.length, loading]);
 
   useEffect(() => {
-    expandAnim.setValue(0);
-    synopsisOpacity.setValue(0);
-    setIsExpanded(false);
-    expandedRef.current = false;
+    pan.setValue({ x: 0, y: 0 });
+    if (expandedRef.current) {
+      Animated.spring(synopsisOpacity, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 12,
+        stiffness: 80,
+      }).start();
+    } else {
+      expandAnim.setValue(0);
+      synopsisOpacity.setValue(0);
+      setIsExpanded(false);
+      expandedRef.current = false;
+    }
   }, [cardIndex]);
 
   useEffect(() => {
@@ -241,19 +232,32 @@ export function PickScreen() {
 
   const finishSwipe = useCallback((direction) => {
     const targetX = direction === "right" ? SCREEN_WIDTH * 2 : -(SCREEN_WIDTH * 2);
+    const wasExpanded = expandedRef.current;
     Animated.timing(pan, {
       toValue: { x: targetX, y: 0 },
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
       isSwiping.current = false;
-      pan.setValue({ x: 0, y: 0 });
+      rightOverlayOpacity.setValue(0);
+      leftOverlayOpacity.setValue(0);
       const idx = cardIndexRef.current;
       handleSwiped(direction, idx);
 
       const nextIndex = idx + 1;
-      cardIndexRef.current = nextIndex;
-      setCardIndex(nextIndex);
+      if (wasExpanded) {
+        Animated.timing(synopsisOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }).start(() => {
+          cardIndexRef.current = nextIndex;
+          setCardIndex(nextIndex);
+        });
+      } else {
+        cardIndexRef.current = nextIndex;
+        setCardIndex(nextIndex);
+      }
     });
   }, [handleSwiped, pan]);
 
@@ -265,6 +269,15 @@ export function PickScreen() {
       },
       onPanResponderMove: (_, g) => {
         pan.setValue({ x: g.dx, y: 0 });
+        const progress = Math.min(Math.abs(g.dx) / SWIPE_THRESHOLD, 1);
+        const opacity = progress * 0.5;
+        if (g.dx > 0) {
+          rightOverlayOpacity.setValue(opacity);
+          leftOverlayOpacity.setValue(0);
+        } else {
+          leftOverlayOpacity.setValue(opacity);
+          rightOverlayOpacity.setValue(0);
+        }
       },
       onPanResponderRelease: (_, g) => {
         if (g.dx > SWIPE_THRESHOLD) {
@@ -272,6 +285,8 @@ export function PickScreen() {
         } else if (g.dx < -SWIPE_THRESHOLD) {
           finishSwipe("left");
         } else {
+          rightOverlayOpacity.setValue(0);
+          leftOverlayOpacity.setValue(0);
           Animated.spring(pan, {
             toValue: { x: 0, y: 0 },
             useNativeDriver: true,
@@ -283,6 +298,8 @@ export function PickScreen() {
         }
       },
       onPanResponderTerminate: () => {
+        rightOverlayOpacity.setValue(0);
+        leftOverlayOpacity.setValue(0);
         Animated.spring(pan, {
           toValue: { x: 0, y: 0 },
           useNativeDriver: true,
@@ -328,23 +345,18 @@ export function PickScreen() {
           <View style={styles.cardGenres}>
             {(movie.genre_ids || []).map(id => genreMap[id]).filter(Boolean).map((name, i, arr) => (
               <React.Fragment key={name}>
-                <Text style={{ color: GENRE_COLORS[name] || "#fff", fontSize: 16, fontWeight: "700" }}>
+                <Text style={{ color: colors.genre[name] || colors.text.primary, fontSize: 16, fontWeight: "700" }}>
                   {name}
                 </Text>
                 {i < arr.length - 1 && (
-                  <Text style={{ color: "#fff", fontSize: 16 }}> · </Text>
+                  <Text style={{ color: colors.text.primary, fontSize: 16 }}> · </Text>
                 )}
               </React.Fragment>
             ))}
           </View>
-          {directors[movie.id] && (
-            <Text style={styles.cardDirector}>
-              Dir. {directors[movie.id]}
-            </Text>
-          )}
           <Text style={[
             styles.cardRating,
-            { color: (movie.vote_average || 0) >= 8 ? "#fbbf24" : "rgba(255,255,255,1)" }
+            { color: (movie.vote_average || 0) >= 8 ? colors.rating : colors.text.primary }
           ]}>
             ★ {movie.vote_average?.toFixed(1) || "N/A"}
           </Text>
@@ -381,35 +393,38 @@ export function PickScreen() {
     extrapolate: "clamp",
   });
 
-  const rightOverlayOpacity = pan.x.interpolate({
-    inputRange: [0, 15, SWIPE_THRESHOLD],
-    outputRange: [0, 0, 0.5],
-    extrapolate: "clamp",
-  });
-
-  const leftOverlayOpacity = pan.x.interpolate({
-    inputRange: [-SWIPE_THRESHOLD, -15, 0],
-    outputRange: [0.5, 0, 0],
-    extrapolate: "clamp",
-  });
-
   return (
     <View style={styles.container}>
       <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: "#22c55e", opacity: rightOverlayOpacity }]} />
       <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: "#ef4444", opacity: leftOverlayOpacity }]} />
       <View style={{ alignItems: "center", paddingBottom: 120 }}>
       <Text style={[styles.subtitle, { marginTop: 30 }]}>
-        <Text style={{ color: "#ef4444" }}>Left to pass</Text> · <Text style={{ color: "#22c55e" }}>right to save</Text>
+        <Text style={{ color: colors.swipe.pass }}>Left to pass</Text> · <Text style={{ color: colors.swipe.save }}>right to save</Text>
       </Text>
-      <Text style={{ color: "#fff", fontSize: 13, marginTop: -20 }}>tap for synopsis</Text>
+      <Text style={{ color: colors.text.primary, fontSize: 13, marginTop: -20 }}>tap for synopsis</Text>
 
       {movies.length > 0 && (
         <Animated.View style={[styles.swiperContainer, { transform: [{ translateY: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -100] }) }] }]}>
           <View style={styles.cardStack}>
             {nextCard && (
-              <View style={styles.cardStackBack}>
+              <Animated.View
+                style={[
+                  styles.cardStackBack,
+                  {
+                    transform: [
+                      {
+                        scale: pan.x.interpolate({
+                          inputRange: [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
+                          outputRange: [1, 0.9, 1],
+                          extrapolate: "clamp",
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
                 {renderCard(nextCard)}
-              </View>
+              </Animated.View>
             )}
             {topCard && (
               <Animated.View
@@ -445,7 +460,7 @@ export function PickScreen() {
             transform: [{ translateY: -155 }],
           }}
         >
-          <Text style={styles.synopsisText} numberOfLines={10} adjustsFontSizeToFit minimumFontScale={0.7}>{topCard.overview}</Text>
+          <Text style={styles.synopsisText} numberOfLines={8} adjustsFontSizeToFit minimumFontScale={0.7}>{topCard.overview}</Text>
         </Animated.View>
       )}
 
@@ -479,7 +494,7 @@ export function PickScreen() {
 
 const styles = StyleSheet.create({
   synopsisText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
@@ -490,28 +505,28 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: colors.bg.primary,
     alignItems: "center",
     paddingTop: 25,
     paddingHorizontal: 0,
   },
   title: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 28,
     fontWeight: "800",
     marginBottom: 4,
   },
   subtitle: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 14,
     marginBottom: 24,
   },
   loadingText: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 16,
   },
   errorText: {
-    color: "#ff6b6b",
+    color: colors.accentSecondary,
     fontSize: 16,
   },
   swiperContainer: {
@@ -536,7 +551,7 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 16,
+    borderRadius: 4,
     backgroundColor: "transparent",
   },
   cardImage: {
@@ -544,16 +559,16 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
     overflow: "hidden",
-    borderRadius: 16,
+    borderRadius: 4,
   },
   cardPlaceholder: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.bg.elevated,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 4,
   },
   placeholderText: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.text.tertiary,
     fontSize: 16,
   },
   cardInfo: {
@@ -564,18 +579,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 0,
     paddingTop: 15,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
   },
   cardTitle: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 28,
     fontWeight: "700",
     top: -5,
     left: -5,
   },
   cardYear: {
-    color: "rgba(255,255,255,0.65)",
+    color: colors.text.secondary,
     fontSize: 16,
     fontWeight: "700",
     marginLeft: 0,
@@ -590,9 +605,9 @@ const styles = StyleSheet.create({
     left: -3,
   },
   cardDirector: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 15,
-    top: -3,
+    top: -5,
     left: -3,
   },
   cardRating: {
@@ -606,17 +621,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#0B1220",
+    backgroundColor: colors.bg.primary,
     zIndex: 10,
   },
   doneText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 24,
     fontWeight: "700",
     marginBottom: 12,
   },
   pickedCount: {
-    color: "rgba(255,255,255,0.6)",
+    color: colors.text.secondary,
     fontSize: 16,
     marginBottom: 24,
   },
@@ -627,7 +642,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   resetText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 16,
     fontWeight: "600",
   },

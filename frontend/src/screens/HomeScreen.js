@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, Refr
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
 import { AuthContext } from "../auth/AuthContext";
+import { colors } from "../theme";
 import { MovieCard } from "../components/MovieCard";
 import {
   fetchPopularMovies,
@@ -125,8 +126,8 @@ export function HomeScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor="#fff"
-                colors={["#fff"]}
+                tintColor={colors.text.primary}
+                colors={[colors.text.primary]}
               />
             }
           >
@@ -139,7 +140,7 @@ export function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item }) => (
-                    <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+                    <MovieCard movie={item} showTitle={false} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
                   )}
                   contentContainerStyle={styles.sectionList}
                 />
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: colors.bg.primary,
   },
   signOutButton: {
     position: "absolute",
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   signOutText: {
-    color: "rgba(255,255,255,0.6)",
+    color: colors.text.secondary,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -178,16 +179,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 32,
     marginBottom: 8,
   },
   statusText: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.text.tertiary,
     fontSize: 16,
   },
   error: {
-    color: "#ff6b6b",
+    color: colors.accentSecondary,
     fontSize: 16,
     marginBottom: 16,
   },
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -210,11 +211,21 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 18,
     fontWeight: "700",
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     marginBottom: 12,
+  },
+  sectionTitle: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  sectionList: {
+    paddingHorizontal: 6,
   },
   sectionList: {
     paddingHorizontal: 20,
