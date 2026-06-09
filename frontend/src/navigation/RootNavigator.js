@@ -12,7 +12,8 @@ import { FavoritesScreen } from "../screens/FavoritesScreen";
 import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
 import { colors } from "../theme";
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, View, Text, Animated, Pressable } from "react-native";
+import { ActivityIndicator, View, Animated, Pressable } from "react-native";
+import { withFadeTransition } from "../components/AnimatedScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -46,6 +47,11 @@ function AnimatedTabButton({ children, onPress, accessibilityState, ...props }) 
     </Pressable>
   );
 }
+
+const AnimatedHomeScreen = withFadeTransition(HomeScreen);
+const AnimatedSearchScreen = withFadeTransition(SearchScreen);
+const AnimatedFavoritesScreen = withFadeTransition(FavoritesScreen);
+const AnimatedPickScreen = withFadeTransition(PickScreen);
 
 function MoviesTabs() {
   return (
@@ -88,22 +94,22 @@ function MoviesTabs() {
     >
       <Tab.Screen
         name="Browse"
-        component={HomeScreen}
+        component={AnimatedHomeScreen}
         options={{ tabBarLabel: "Browse", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
       <Tab.Screen
         name="Search"
-        component={SearchScreen}
+        component={AnimatedSearchScreen}
         options={{ tabBarLabel: "Search", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
       <Tab.Screen
         name="Favorites"
-        component={FavoritesScreen}
+        component={AnimatedFavoritesScreen}
         options={{ tabBarLabel: "Favorites", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
       <Tab.Screen
         name="Pick"
-        component={PickScreen}
+        component={AnimatedPickScreen}
         options={{ tabBarLabel: "Pick", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
     </Tab.Navigator>

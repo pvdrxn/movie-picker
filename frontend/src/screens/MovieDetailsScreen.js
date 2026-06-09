@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMovieTrailer, fetchMovieReleaseDates } from "../services/tmdb";
 import { addPick, getPicks, subscribePicks, subscribeWatched, getWatchedPicks, toggleWatched } from "../api/picksApi";
 import { colors } from "../theme";
@@ -171,7 +172,7 @@ export function MovieDetailsScreen({ route, navigation }) {
 
   const director = credits?.crew?.find((person) => person.job === "Director");
   const cast = credits?.cast?.slice(0, 10) || [];
-  const genres = movie.genres?.map((g) => g.name).join(" · ") || "";
+  const genres = movie.genres || [];
 
   const getAdditionalRatings = () => {
     if (!releaseDates?.results) return null;
@@ -201,105 +202,95 @@ export function MovieDetailsScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        <View style={styles.topBar}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-          </Pressable>
-        </View>
-        <View style={styles.header}>
-          {movie.poster_path ? (
+        {movie.backdrop_path ? (
+          <View style={styles.backdropContainer}>
             <Image
-              source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
-              style={styles.poster}
+              source={{ uri: `https://image.tmdb.org/t/p/w780${movie.backdrop_path}` }}
+              style={styles.backdropImage}
             />
-          ) : (
-            <View style={[styles.poster, styles.posterPlaceholder]}>
-              <Text style={styles.posterInitials}>
-                {movie.title.split(" ").map(n => n[0]).join("").slice(0, 2)}
-              </Text>
+            <View style={styles.backdropOverlay} />
+            <View style={styles.backdropContent}>
+              {trailer && (
+                <Pressable onPress={handlePlayTrailer}>
+                  <Ionicons name="play-circle" size={48} color="#fff" />
+                </Pressable>
+              )}
             </View>
-          )}
+            <LinearGradient
+              colors={["transparent", colors.bg.primary]}
+              style={styles.backdropBottomFade}
+              pointerEvents="none"
+            />
+          </View>
+        ) : (
+          <View style={styles.topBarPlaceholder} />
+        )}
+        <View style={styles.header}>
+          <View>
+            {movie.poster_path ? (
+              <Image
+                source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }}
+                style={styles.poster}
+              />
+            ) : (
+              <View style={[styles.poster, styles.posterPlaceholder]}>
+                <Text style={styles.posterInitials}>
+                  {movie.title.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                </Text>
+              </View>
+            )}
+          </View>
           <View style={styles.headerInfo}>
-            <Text style={styles.title}>{movie.title}</Text>
-            <Text style={styles.rating}>★ {movie.vote_average?.toFixed(1) || "N/A"}</Text>
-            {(() => {
-              const ratings = getRatings();
-              if (ratings.length === 0) return null;
-              return (
-                <View style={styles.ratingsContainer}>
-                  {ratings.map((r, i) => (
-                    <View key={i} style={styles.ratingBadge}>
-                      <Text style={styles.ratingBadgeText}>{r.source} {r.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-            <View style={styles.actionButtons}>
-              <Pressable onPress={handleToggleFavorite} style={styles.favoriteButton}>
-                <Ionicons
-                  name={isFavorite ? "heart" : "heart-outline"}
-                  size={24}
-                  color={isFavorite ? colors.favorite : colors.text.secondary}
-                />
-              </Pressable>
-              <Pressable onPress={handleToggleWatched} style={styles.watchedButton}>
-                <Ionicons
-                  name="eye"
-                  size={24}
-                  color={isWatched ? colors.success : colors.text.secondary}
-                />
-              </Pressable>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{movie.title}</Text>
+            </View>
+            <View style={styles.ratingRow}>
+              <Text style={styles.rating}>★ {movie.vote_average?.toFixed(1) || "N/A"}</Text>
+              {(() => {
+                const ratings = getRatings();
+                if (ratings.length === 0) return null;
+                return (
+                  <View style={styles.ratingsContainer}>
+                    {ratings.map((r, i) => (
+                      <View key={i} style={styles.ratingBadge}>
+                        <Text style={styles.ratingBadgeText}>{r.source} {r.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
             </View>
             <Text style={styles.meta}>
               {movie.release_date?.split("-")[0] || "N/A"} · {movie.runtime} min
             </Text>
-            <Text style={styles.genres}>{genres}</Text>
+            {director && (
+              <Text style={styles.metaDir}>Dir. {director.name}</Text>
+            )}
+            <View style={styles.genresRow}>
+              {genres.map((g, i) => (
+                <React.Fragment key={g.id}>
+                  {i > 0 && <Text style={styles.genreSeparator}> · </Text>}
+                  <Text style={[styles.genreText, { color: colors.genre[g.name] || colors.text.tertiary }]}>{g.name}</Text>
+                </React.Fragment>
+              ))}
+            </View>
           </View>
         </View>
 
-        {director && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Director</Text>
-            <View style={styles.directorRow}>
-              {director.profile_path ? (
-                <Image
-                  source={{ uri: `https://image.tmdb.org/t/p/w185${director.profile_path}` }}
-                  style={styles.directorImage}
-                />
-              ) : (
-                <View style={[styles.directorImage, styles.castPlaceholder]}>
-                  <Text style={styles.castInitials}>
-                    {director.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                  </Text>
-                </View>
-              )}
-              <Text style={styles.directorText}>{director.name}</Text>
-            </View>
+        {movie.tagline ? (
+          <View style={[styles.section, { paddingBottom: 0 }]}>
+            <Text style={styles.tagline}>{movie.tagline}</Text>
           </View>
-        )}
+        ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Synopsis</Text>
+        <View style={[styles.section, { paddingTop: 0 }]}>
           <Text style={styles.synopsis}>
             {movie.overview || "No synopsis available."}
           </Text>
         </View>
 
-        {trailer && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Trailer</Text>
-            <Pressable
-              style={styles.trailerButton}
-              onPress={handlePlayTrailer}
-            >
-              <Ionicons name="play-circle" size={40} color={colors.text.primary} />
-            </Pressable>
-          </View>
-        )}
-
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cast</Text>
+          <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Cast</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.castScroll}>
             {cast.map((actor) => (
               <View key={actor.id} style={styles.castItem}>
@@ -351,6 +342,27 @@ export function MovieDetailsScreen({ route, navigation }) {
             );
           })()}
       </ScrollView>
+      <View style={styles.stickyHeader}>
+        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+        </Pressable>
+        <View style={styles.stickyActions}>
+          <Pressable onPress={handleToggleFavorite}>
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={24}
+              color={isFavorite ? colors.favorite : "#fff"}
+            />
+          </Pressable>
+          <Pressable onPress={handleToggleWatched} style={{ marginLeft: 16 }}>
+            <Ionicons
+              name="eye"
+              size={24}
+              color={isWatched ? colors.success : "#fff"}
+            />
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -363,10 +375,24 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  topBar: {
-    padding: 10,
-    paddingTop: 25,
-    paddingLeft: 3
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 50,
+    paddingHorizontal: 10,
+    zIndex: 10,
+  },
+  stickyActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  topBarPlaceholder: {
+    height: 90,
   },
   backButton: {
     width: 45,
@@ -406,37 +432,51 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     marginBottom: 4,
+    flexShrink: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 4,
   },
   rating: {
     color: colors.rating,
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 4,
-  },
-  favoriteButton: {
-    marginTop: 4,
-  },
-  watchedButton: {
-    marginTop: 4,
-    marginLeft: 12,
-  },
-  actionButtons: {
-    flexDirection: "row",
   },
   meta: {
     color: colors.text.secondary,
     fontSize: 14,
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  genres: {
+  metaDir: {
+    color: colors.text.tertiary,
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  genresRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  genreText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  genreSeparator: {
     color: colors.text.tertiary,
     fontSize: 12,
   },
   ratingsContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 4,
+    marginLeft: 8,
+    alignSelf: "center",
     marginBottom: 4,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
   },
   ratingBadge: {
     backgroundColor: "rgba(255,255,255,0.15)",
@@ -461,20 +501,44 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 12,
   },
-  directorRow: {
-    alignItems: "flex-start",
+  backdropContainer: {
+    position: "relative",
+    width: "100%",
+    height: 280,
   },
-  directorImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 8,
+  backdropImage: {
+    width: "100%",
+    height: "100%",
   },
-  directorText: {
-    color: colors.text.secondary,
-    fontSize: 14,
-    textAlign: "center",
-    width: 80,
+  backdropOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  backdropBottomFade: {
+    position: "absolute",
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 120,
+  },
+  backdropContent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tagline: {
+    color: colors.text.tertiary,
+    fontSize: 15,
+    fontStyle: "italic",
+    lineHeight: 22,
   },
   synopsis: {
     color: colors.text.secondary,
@@ -547,14 +611,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "center",
     marginTop: 4,
-  },
-  trailerButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
   },
   noProvidersText: {
     color: colors.text.tertiary,
