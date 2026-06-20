@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions } from "react-native";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { View, Text, Image, StyleSheet, ScrollView, Pressable, Dimensions, Animated } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -7,22 +7,42 @@ import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMo
 import { addPick, getPicks, subscribePicks, subscribeWatched, getWatchedPicks, toggleWatched } from "../api/picksApi";
 import { colors } from "../theme";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export function MovieDetailsScreen({ route, navigation }) {
-  const { movieId } = route.params;
-  const [movie, setMovie] = useState(null);
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const { movieId, initialMovieData } = route.params;
+  const [movie, setMovie] = useState(initialMovieData || null);
   const [credits, setCredits] = useState(null);
   const [watchProviders, setWatchProviders] = useState(null);
   const [trailer, setTrailer] = useState(null);
   const [releaseDates, setReleaseDates] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialMovieData);
 
   const handlePlayTrailer = async () => {
     if (trailer?.key) {
       await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
     }
   };
+
+  const handleBack = () => {
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      navigation.goBack();
+    });
+  };
+
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 450,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
@@ -154,26 +174,6 @@ export function MovieDetailsScreen({ route, navigation }) {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
-
-  if (error || !movie) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-      </View>
-    );
-  }
-
-  const director = credits?.crew?.find((person) => person.job === "Director");
-  const cast = credits?.cast?.slice(0, 10) || [];
-  const genres = movie.genres || [];
-
   const getAdditionalRatings = () => {
     if (!releaseDates?.results) return null;
     const usRelease = releaseDates.results.find(r => r.iso_3166_1 === "US");
@@ -200,8 +200,18 @@ export function MovieDetailsScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+    <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      ) : !movie ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>Error: {error}</Text>
+        </View>
+      ) : (
+        <>
+          <ScrollView style={styles.scrollView}>
         {movie.backdrop_path ? (
           <View style={styles.backdropContainer}>
             <Image
@@ -261,13 +271,15 @@ export function MovieDetailsScreen({ route, navigation }) {
               })()}
             </View>
             <Text style={styles.meta}>
-              {movie.release_date?.split("-")[0] || "N/A"} · {movie.runtime} min
+              {movie.release_date?.split("-")[0] || "N/A"} · {movie.runtime ?? "—"} min
             </Text>
-            {director && (
-              <Text style={styles.metaDir}>Dir. {director.name}</Text>
-            )}
+            {(() => {
+              const director = credits?.crew?.find((person) => person.job === "Director");
+              if (!director) return null;
+              return <Text style={styles.metaDir}>Dir. {director.name}</Text>;
+            })()}
             <View style={styles.genresRow}>
-              {genres.map((g, i) => (
+              {(movie.genres || []).map((g, i) => (
                 <React.Fragment key={g.id}>
                   {i > 0 && <Text style={styles.genreSeparator}> · </Text>}
                   <Text style={[styles.genreText, { color: colors.genre[g.name] || colors.text.tertiary }]}>{g.name}</Text>
@@ -292,7 +304,7 @@ export function MovieDetailsScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Cast</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.castScroll}>
-            {cast.map((actor) => (
+            {(credits?.cast?.slice(0, 10) || []).map((actor) => (
               <View key={actor.id} style={styles.castItem}>
                 {actor.profile_path ? (
                   <Image
@@ -343,8 +355,8 @@ export function MovieDetailsScreen({ route, navigation }) {
           })()}
       </ScrollView>
       <View style={styles.stickyHeader}>
-        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+        <Pressable style={styles.backButton} onPress={handleBack}>
+          <Ionicons name="chevron-down" size={24} color={colors.text.primary} />
         </Pressable>
         <View style={styles.stickyActions}>
           <Pressable onPress={handleToggleFavorite}>
@@ -363,7 +375,9 @@ export function MovieDetailsScreen({ route, navigation }) {
           </Pressable>
         </View>
       </View>
-    </View>
+        </>
+      )}
+    </Animated.View>
   );
 }
 
@@ -580,17 +594,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "center",
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   loadingText: {
     color: colors.text.tertiary,
     fontSize: 16,
     textAlign: "center",
-    marginTop: 100,
   },
   errorText: {
     color: colors.accentSecondary,
     fontSize: 16,
     textAlign: "center",
-    marginTop: 100,
   },
   providerScroll: {
     flexDirection: "row",

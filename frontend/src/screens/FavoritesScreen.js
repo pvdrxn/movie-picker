@@ -116,7 +116,7 @@ export function FavoritesScreen() {
                   vote_average: item.rating,
                 }}
                 watched={item.watched}
-                onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })}
+                onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id, initialMovieData: movie })}
               />
             </View>
           )}

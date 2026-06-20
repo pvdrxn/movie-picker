@@ -1,21 +1,23 @@
 import React, { useContext, useEffect, useRef } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { AuthContext } from "../auth/AuthContext";
 import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { PickScreen } from "../screens/PickScreen";
-import { SearchScreen } from "../screens/SearchScreen";
 import { FavoritesScreen } from "../screens/FavoritesScreen";
 import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
 import { colors } from "../theme";
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, View, Animated, Pressable } from "react-native";
 import { withFadeTransition } from "../components/AnimatedScreen";
 
-const Stack = createNativeStackNavigator();
+const AuthStack = createNativeStackNavigator();
+const AppNav = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function Splash() {
@@ -49,9 +51,9 @@ function AnimatedTabButton({ children, onPress, accessibilityState, ...props }) 
 }
 
 const AnimatedHomeScreen = withFadeTransition(HomeScreen);
-const AnimatedSearchScreen = withFadeTransition(SearchScreen);
 const AnimatedFavoritesScreen = withFadeTransition(FavoritesScreen);
 const AnimatedPickScreen = withFadeTransition(PickScreen);
+const AnimatedSettingsScreen = withFadeTransition(SettingsScreen);
 
 function MoviesTabs() {
   return (
@@ -81,12 +83,12 @@ function MoviesTabs() {
           let iconName;
           if (route.name === "Browse") {
             iconName = focused ? "star" : "star-outline";
-          } else if (route.name === "Search") {
-            iconName = focused ? "search" : "search-outline";
           } else if (route.name === "Favorites") {
             iconName = focused ? "heart" : "heart-outline";
           } else if (route.name === "Pick") {
             iconName = focused ? "shuffle" : "shuffle-outline";
+          } else if (route.name === "Settings") {
+            iconName = focused ? "settings" : "settings-outline";
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -98,11 +100,6 @@ function MoviesTabs() {
         options={{ tabBarLabel: "Browse", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
       <Tab.Screen
-        name="Search"
-        component={AnimatedSearchScreen}
-        options={{ tabBarLabel: "Search", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
-      />
-      <Tab.Screen
         name="Favorites"
         component={AnimatedFavoritesScreen}
         options={{ tabBarLabel: "Favorites", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
@@ -112,20 +109,31 @@ function MoviesTabs() {
         component={AnimatedPickScreen}
         options={{ tabBarLabel: "Pick", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
+      <Tab.Screen
+        name="Settings"
+        component={AnimatedSettingsScreen}
+        options={{ tabBarLabel: "Settings", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
+      />
     </Tab.Navigator>
   );
 }
 
 function AppStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MoviesTabs" component={MoviesTabs} />
-      <Stack.Screen
+    <AppNav.Navigator
+      screenOptions={{
+        headerShown: false,
+        gestureDirection: "vertical",
+        cardStyle: { backgroundColor: colors.bg.primary },
+      }}
+    >
+      <AppNav.Screen name="MoviesTabs" component={MoviesTabs} />
+      <AppNav.Screen
         name="MovieDetails"
         component={MovieDetailsScreen}
-        options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        options={{ cardStyle: { backgroundColor: colors.bg.primary } }}
       />
-    </Stack.Navigator>
+    </AppNav.Navigator>
   );
 }
 
@@ -139,13 +147,13 @@ export function RootNavigator() {
       {isSignedIn ? (
         <AppStack />
       ) : (
-        <Stack.Navigator
+        <AuthStack.Navigator
           initialRouteName="Login"
           screenOptions={{ headerStyle: { backgroundColor: colors.bg.primary }, headerTintColor: colors.text.primary }}
         >
-          <Stack.Screen name="Login" component={LoginScreen} options={{ title: "Log in" }} />
-          <Stack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
-        </Stack.Navigator>
+          <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Log in" }} />
+          <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
+        </AuthStack.Navigator>
       )}
     </NavigationContainer>
   );

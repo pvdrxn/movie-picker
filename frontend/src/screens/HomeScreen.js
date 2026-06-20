@@ -1,8 +1,8 @@
-import React, { useContext, useState, useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, RefreshControl } from "react-native";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, RefreshControl, TextInput, LayoutAnimation } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
-import { AuthContext } from "../auth/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../theme";
 import { MovieCard } from "../components/MovieCard";
 import {
@@ -10,6 +10,9 @@ import {
   fetchTrendingMovies,
   fetchTopRatedMovies,
   fetchUpcomingMovies,
+  fetchGenres,
+  searchMovies,
+  discoverMovies,
 } from "../services/tmdb";
 import { getWatchedPicks, subscribeWatched } from "../api/picksApi";
 
@@ -21,15 +24,32 @@ const CATEGORIES = [
 ];
 
 export function HomeScreen() {
-  const { signOut } = useContext(AuthContext);
   const navigation = useNavigation();
   const [categoryData, setCategoryData] = useState({});
   const [watchedIds, setWatchedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [genres, setGenres] = useState([]);
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [startYear, setStartYear] = useState("");
+  const [endYear, setEndYear] = useState("");
+  const [minRating, setMinRating] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
+  const debounceRef = useRef(null);
   const rotation = useRef(new Animated.Value(0)).current;
+  const scaleAnims = useRef({});
+
+  const getScaleAnim = (id) => {
+    if (!scaleAnims.current[id]) {
+      scaleAnims.current[id] = new Animated.Value(1);
+    }
+    return scaleAnims.current[id];
+  };
 
   const fetchWatched = async () => {
     try {
@@ -48,7 +68,6 @@ export function HomeScreen() {
           return { [category.key]: data.results || [] };
         })
       );
-
       const merged = Object.assign({}, ...results);
       setCategoryData(merged);
     } catch (err) {
@@ -63,6 +82,7 @@ export function HomeScreen() {
   useEffect(() => {
     fetchAllCategories();
     fetchWatched();
+    fetchGenres().then((data) => setGenres(data.genres || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -76,15 +96,9 @@ export function HomeScreen() {
     if (refreshing) return;
     setRefreshing(true);
     setError(null);
-
     Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      })
+      Animated.timing(rotation, { toValue: 1, duration: 1000, useNativeDriver: true })
     ).start();
-
     fetchAllCategories();
   };
 
@@ -93,23 +107,190 @@ export function HomeScreen() {
     outputRange: ["0deg", "360deg"],
   });
 
+  const doSearch = useCallback(async (q, genreId, sy, ey, rating) => {
+    if (!q.trim() && !genreId && !sy && !ey && !rating) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    try {
+      let results;
+      if (!q.trim()) {
+        const data = await discoverMovies({ genreId, startYear: sy || undefined, endYear: ey || undefined, rating: rating || undefined });
+        results = data.results || [];
+      } else {
+        const data = await searchMovies(q.trim(), { page: 1 });
+        results = data.results || [];
+        if (genreId) {
+          results = results.filter((m) => m.genre_ids?.includes(genreId));
+        }
+        if (sy) {
+          results = results.filter((m) => m.release_date && m.release_date >= `${sy}-01-01`);
+        }
+        if (ey) {
+          results = results.filter((m) => m.release_date && m.release_date <= `${ey}-12-31`);
+        }
+        if (rating) {
+          results = results.filter((m) => m.vote_average != null && m.vote_average >= Number(rating));
+        }
+      }
+      setSearchResults(results);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const handleSearch = (text) => {
+    setQuery(text);
+  };
+
+  const handleGenreSelect = (genreId) => {
+    const prevId = selectedGenre;
+    setSelectedGenre((prev) => (genreId === prev ? null : genreId));
+    if (prevId && scaleAnims.current[prevId]) {
+      Animated.timing(scaleAnims.current[prevId], {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+    if (genreId !== prevId) {
+      Animated.timing(getScaleAnim(genreId), {
+        toValue: 1.05,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const clearSearch = () => {
+    setQuery("");
+    setSearchResults([]);
+    setSearching(false);
+    setSelectedGenre(null);
+    setStartYear("");
+    setEndYear("");
+    setMinRating("");
+  };
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      doSearch(query, selectedGenre, startYear, endYear, minRating);
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, selectedGenre, startYear, endYear, minRating]);
+
+  const numColumns = 2;
+  const columnPadding = 8;
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <View style={styles.container}>
-        <Pressable onPress={signOut} hitSlop={10} style={styles.signOutButton}>
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={18} color={colors.text.tertiary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search movies..."
+                placeholderTextColor={colors.text.tertiary}
+                value={query}
+                onChangeText={handleSearch}
+              />
+              {query.length > 0 && (
+                <Pressable onPress={clearSearch} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color={colors.text.tertiary} />
+                </Pressable>
+              )}
+            </View>
+            <Pressable onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setShowFilters((v) => !v);
+            }} style={styles.filterToggle}>
+              <Ionicons name={showFilters ? "options" : "options-outline"} size={24} color={colors.accent} />
+            </Pressable>
+          </View>
+          {showFilters && (
+          <>
+          {genres.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
+              {genres.map((g) => {
+                const active = selectedGenre === g.id;
+                return (
+                  <Animated.View key={g.id} style={{ transform: [{ scale: getScaleAnim(g.id) }] }}>
+                  <Pressable
+                    onPress={() => handleGenreSelect(g.id)}
+                    style={[styles.filterChip, active && { backgroundColor: colors.genre[g.name] || colors.text.primary }, { borderColor: colors.genre[g.name] || colors.text.tertiary }]}
+                  >
+                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{g.name}</Text>
+                  </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </ScrollView>
+          )}
+          <View style={styles.filterInputsRow}>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="From"
+                placeholderTextColor={colors.text.muted}
+                value={startYear}
+                onChangeText={(v) => setStartYear(v.replace(/[^0-9]/g, ""))}
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+              <Text style={styles.filterInputSep}>-</Text>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="To"
+                placeholderTextColor={colors.text.muted}
+                value={endYear}
+                onChangeText={(v) => setEndYear(v.replace(/[^0-9]/g, ""))}
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+              <Text style={styles.filterInputSep}>|</Text>
+              <TextInput
+                style={[styles.filterInput, { width: 70 }]}
+                placeholder="Rating"
+                placeholderTextColor={colors.text.muted}
+                value={minRating}
+                onChangeText={(v) => setMinRating(v.replace(/[^0-9.]/g, ""))}
+                keyboardType="decimal-pad"
+                maxLength={3}
+              />
+            </View>
+          </>
+          )}
+        </View>
 
-        {(loading || refreshing) && !error ? (
+        {query.length > 0 || selectedGenre ? (
+          <FlatList
+            data={searchResults}
+            numColumns={numColumns}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={[styles.searchResultsContent, { paddingBottom: 100 }]}
+            renderItem={({ item }) => (
+              <View style={[styles.movieItem, { width: `${100 / numColumns}%` }]}>
+                <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id, initialMovieData: movie })} />
+              </View>
+            )}
+            ListEmptyComponent={
+              searching ? null : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No movies found</Text>
+                </View>
+              )
+            }
+          />
+        ) : (loading || refreshing) && !error ? (
           <View style={styles.content}>
-            <Animated.Text
-              style={[styles.loadingText, { transform: [{ rotate: spin }] }]}
-            >
-              ↻
-            </Animated.Text>
-            <Text style={styles.statusText}>
-              {refreshing ? "Refreshing..." : "Loading..."}
-            </Text>
+            <Animated.Text style={[styles.loadingText, { transform: [{ rotate: spin }] }]}>↻</Animated.Text>
+            <Text style={styles.statusText}>{refreshing ? "Refreshing..." : "Loading..."}</Text>
           </View>
         ) : error ? (
           <View style={styles.content}>
@@ -123,12 +304,7 @@ export function HomeScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.text.primary}
-                colors={[colors.text.primary]}
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text.primary} colors={[colors.text.primary]} />
             }
           >
             {CATEGORIES.map((category) => (
@@ -140,7 +316,7 @@ export function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item }) => (
-                    <MovieCard movie={item} showTitle={false} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+                    <MovieCard movie={item} showTitle={false} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id, initialMovieData: movie })} />
                   )}
                   contentContainerStyle={styles.sectionList}
                 />
@@ -154,80 +330,104 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
+  root: { flex: 1 },
+  container: { flex: 1, backgroundColor: colors.bg.primary },
+  searchContainer: {
+    paddingTop: 55,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
     backgroundColor: colors.bg.primary,
-  },
-  signOutButton: {
-    position: "absolute",
-    top: 20,
-    right: 20,
     zIndex: 10,
-    padding: 8,
   },
-  signOutText: {
-    color: colors.text.secondary,
-    fontSize: 14,
-    fontWeight: "600",
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  content: {
+  searchBar: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.bg.card,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 40,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text.primary,
+    fontSize: 15,
+    marginLeft: 8,
+    padding: 0,
+  },
+  filterToggle: {
+    marginLeft: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.bg.card,
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    color: colors.text.tertiary,
-    fontSize: 32,
-    marginBottom: 8,
+  filterRow: {
+    marginTop: 8,
   },
-  statusText: {
-    color: colors.text.tertiary,
-    fontSize: 16,
+  filterContent: {
+    paddingRight: 12,
   },
-  error: {
-    color: colors.accentSecondary,
-    fontSize: 16,
-    marginBottom: 16,
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: colors.bg.card,
+    marginRight: 8,
+    borderWidth: 1,
   },
-  retryButton: {
-    backgroundColor: "rgba(255,255,255,0.15)",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+  filterChipActive: {
+    backgroundColor: colors.text.primary,
   },
-  retryText: {
-    color: colors.text.primary,
-    fontSize: 16,
+  filterChipText: {
+    color: colors.text.secondary,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  filterChipTextActive: {
+    color: colors.bg.primary,
     fontWeight: "600",
   },
-  scrollContent: {
-    paddingTop: 50,
-    paddingBottom: 24,
+  filterInputsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
   },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    color: colors.text.primary,
-    fontSize: 18,
-    fontWeight: "700",
+  filterInput: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 8,
     paddingHorizontal: 12,
-    marginBottom: 12,
-  },
-  sectionTitle: {
+    height: 42,
+    width: 72,
     color: colors.text.primary,
-    fontSize: 18,
-    fontWeight: "700",
-    paddingHorizontal: 12,
-    marginBottom: 12,
+    fontSize: 15,
+    textAlign: "center",
   },
-  sectionList: {
-    paddingHorizontal: 6,
+  filterInputSep: {
+    color: colors.accent,
+    fontSize: 16,
+    marginHorizontal: 8,
   },
-  sectionList: {
-    paddingHorizontal: 20,
-  },
+  content: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: colors.text.tertiary, fontSize: 32, marginBottom: 8 },
+  statusText: { color: colors.text.tertiary, fontSize: 16 },
+  error: { color: colors.accentSecondary, fontSize: 16, marginBottom: 16 },
+  retryButton: { backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  retryText: { color: colors.text.primary, fontSize: 16, fontWeight: "600" },
+  scrollContent: { paddingTop: 8, paddingBottom: 100 },
+  section: { marginBottom: 24 },
+  sectionTitle: { color: colors.text.primary, fontSize: 18, fontWeight: "700", paddingHorizontal: 12, marginBottom: 12 },
+  sectionList: { paddingHorizontal: 6 },
+  searchResultsContent: { paddingTop: 8, paddingHorizontal: 4 },
+  movieItem: { padding: 4 },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 },
+  emptyText: { color: colors.text.tertiary, fontSize: 16 },
 });

@@ -221,7 +221,7 @@ export function SearchScreen() {
             ListHeaderComponent={<View style={{ height: 4 }} />}
             renderItem={({ item }) => (
               <View style={styles.movieItem}>
-                <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id })} />
+                <MovieCard movie={item} watched={watchedIds.has(Number(item.id))} onPress={(movie) => navigation.navigate("MovieDetails", { movieId: movie.id, initialMovieData: movie })} />
               </View>
             )}
             contentContainerStyle={{ paddingHorizontal: columnPadding, paddingBottom: 24, paddingRight: 8 }}
