@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import * as authApi from "../api/authApi";
 import { clearTokens, getAccessToken, setTokens } from "./tokenStorage";
+import { subscribeUnauthorized } from "../api/http";
 
 export const AuthContext = createContext(null);
 
@@ -21,6 +22,13 @@ export function AuthProvider({ children }) {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeUnauthorized(() => {
+      setAccessToken(null);
+    });
+    return unsub;
   }, []);
 
   const signIn = useCallback(async ({ username, password }) => {

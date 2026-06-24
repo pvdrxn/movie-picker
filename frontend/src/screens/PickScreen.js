@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, Image, StyleSheet, Dimensions, Pressable, ScrollView, Animated, PanResponder } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { fetchPopularMovies, fetchGenres, fetchMovieCredits, fetchMovieDetails } from "../services/tmdb";
-import { addPick, getPicks } from "../api/picksApi";
+import { addPick, getPicks, subscribePicks } from "../api/picksApi";
 import { colors } from "../theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -117,6 +117,21 @@ export function PickScreen() {
   }, []);
 
   useEffect(() => {
+    const unsub = subscribePicks(async () => {
+      try {
+        const picks = await getPicks();
+        const ids = new Set(picks.map(p => p.tmdb_id));
+        setPickedIds(ids);
+        pickedIdsRef.current = ids;
+        setMovies(prev => prev.filter(m => !ids.has(m.id)));
+      } catch (err) {
+        console.warn("Failed to refresh picks:", err);
+      }
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
     if (movies.length > 0) {
       for (let i = 0; i < Math.min(5, movies.length); i++) {
         const posterUrl = movies[i].poster_path
@@ -190,7 +205,7 @@ export function PickScreen() {
         tmdbId: movie.id,
         title: movie.title,
         posterPath: movie.poster_path,
-        rating: movie.vote_average,
+        rating: movie.vote_average ?? undefined,
         choice,
       });
     } catch (err) {

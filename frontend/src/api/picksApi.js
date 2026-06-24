@@ -36,8 +36,8 @@ export async function addPick({ tmdbId, title, posterPath, rating, choice, notif
   if (posterPath) {
     payload.poster_path = posterPath.startsWith("http") ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`;
   }
-  if (rating != null) {
-    payload.rating = parseFloat(rating.toFixed(1));
+  if (rating != null && typeof rating === "number" && !isNaN(rating)) {
+    payload.rating = Math.round(rating * 10) / 10;
   }
   const { data } = await http.post("/api/picks/", payload);
   if (notify) {
@@ -52,9 +52,11 @@ export async function getPicks(choice = null) {
   return data;
 }
 
-export async function deletePick(id) {
+export async function deletePick(id, { notify = true } = {}) {
   const { data } = await http.delete(`/api/picks/${id}/`);
-  notifyPickListeners();
+  if (notify) {
+    notifyPickListeners();
+  }
   return data;
 }
 

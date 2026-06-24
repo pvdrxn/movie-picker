@@ -13,7 +13,7 @@ class PickedMovieViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         tmdb_id = serializer.validated_data.get("tmdb_id")
-        PickedMovie.objects.update_or_create(
+        obj, _ = PickedMovie.objects.update_or_create(
             user=self.request.user,
             tmdb_id=tmdb_id,
             defaults={
@@ -23,6 +23,7 @@ class PickedMovieViewSet(viewsets.ModelViewSet):
                 "choice": serializer.validated_data.get("choice"),
             },
         )
+        serializer.instance = obj
 
     def list(self, request):
         choice = request.query_params.get("choice")

@@ -4,13 +4,12 @@ import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { fetchMovieDetails, fetchMovieCredits, fetchMovieWatchProviders, fetchMovieTrailer, fetchMovieReleaseDates } from "../services/tmdb";
-import { addPick, getPicks, subscribePicks, subscribeWatched, getWatchedPicks, toggleWatched } from "../api/picksApi";
+import { addPick, deletePick, getPicks, subscribePicks, subscribeWatched, getWatchedPicks, toggleWatched } from "../api/picksApi";
 import { colors } from "../theme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export function MovieDetailsScreen({ route, navigation }) {
-  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const { movieId, initialMovieData } = route.params;
   const [movie, setMovie] = useState(initialMovieData || null);
   const [credits, setCredits] = useState(null);
@@ -25,28 +24,14 @@ export function MovieDetailsScreen({ route, navigation }) {
     }
   };
 
-  const handleBack = () => {
-    Animated.timing(slideAnim, {
-      toValue: SCREEN_HEIGHT,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      navigation.goBack();
-    });
-  };
-
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 450,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
   const [isWatched, setIsWatched] = useState(false);
+  const [isPassed, setIsPassed] = useState(false);
+  const favScale = useRef(new Animated.Value(1)).current;
+  const passScale = useRef(new Animated.Value(1)).current;
+  const watchScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Promise.all([
@@ -93,17 +78,29 @@ export function MovieDetailsScreen({ route, navigation }) {
     }
   }, [movieId]);
 
+  const checkPassed = useCallback(async () => {
+    try {
+      const picks = await getPicks("pass");
+      const found = picks.find(p => p.tmdb_id === movieId);
+      setIsPassed(!!found);
+    } catch (err) {
+      console.warn("Failed to check passed:", err.message);
+    }
+  }, [movieId]);
+
   useEffect(() => {
     checkFavorite();
     checkWatched();
-  }, [checkFavorite, checkWatched]);
+    checkPassed();
+  }, [checkFavorite, checkWatched, checkPassed]);
 
   useEffect(() => {
     const unsubscribePicks = subscribePicks(() => {
       checkFavorite();
+      checkPassed();
     });
     return unsubscribePicks;
-  }, [checkFavorite]);
+  }, [checkFavorite, checkPassed]);
 
   useEffect(() => {
     const unsubscribeWatched = subscribeWatched(() => {
@@ -119,23 +116,21 @@ export function MovieDetailsScreen({ route, navigation }) {
     setIsFavorite(!isFavorite);
     try {
       if (isFavorite) {
-        await addPick({
-          tmdbId: movie.id,
-          title: movie.title,
-          posterPath: movie.poster_path,
-          rating: movie.vote_average,
-          choice: "pass",
-        });
+        if (favoriteId) {
+          await deletePick(favoriteId, { notify: false });
+        }
       } else {
         await addPick({
           tmdbId: movie.id,
           title: movie.title,
           posterPath: movie.poster_path,
-          rating: movie.vote_average,
+          rating: movie.vote_average ?? undefined,
           choice: "saved",
+          notify: false,
         });
       }
       checkFavorite();
+      checkPassed();
     } catch (err) {
       setIsFavorite(previousState);
       setFavoriteId(previousId);
@@ -147,30 +142,57 @@ export function MovieDetailsScreen({ route, navigation }) {
     const previousState = isWatched;
     setIsWatched(!isWatched);
     try {
-      if (!favoriteId && movie) {
+      const allPicks = await getPicks();
+      const existing = allPicks.find(p => Number(p.tmdb_id) === Number(movieId));
+      if (existing) {
+        await toggleWatched(existing.id);
+      } else if (movie) {
+        const data = await addPick({
+          tmdbId: movie.id,
+          title: movie.title,
+          posterPath: movie.poster_path,
+          rating: movie.vote_average ?? undefined,
+          choice: "pass",
+          notify: false,
+        });
+        await toggleWatched(data.id);
+      }
+      checkWatched();
+    } catch (err) {
+      setIsWatched(previousState);
+      console.warn("Failed to toggle watched:", err.message);
+    }
+  };
+
+  const handleTogglePassed = async () => {
+    if (!movie) return;
+    const previousState = isPassed;
+    setIsPassed(!isPassed);
+    try {
+      if (isPassed) {
+        const picks = await getPicks("pass");
+        const found = picks.find(p => p.tmdb_id === movieId);
+        if (found) {
+          await deletePick(found.id, { notify: false });
+        }
+      } else {
+        if (isFavorite && favoriteId) {
+          await deletePick(favoriteId, { notify: false });
+        }
         await addPick({
           tmdbId: movie.id,
           title: movie.title,
           posterPath: movie.poster_path,
-          rating: movie.vote_average,
-          choice: "saved",
+          rating: movie.vote_average ?? undefined,
+          choice: "pass",
           notify: false,
         });
-        const picks = await getPicks("saved");
-        const saved = picks.find(p => Number(p.tmdb_id) === Number(movieId));
-        if (saved) {
-          await toggleWatched(saved.id);
-        }
-        checkWatched();
-        return;
       }
-      if (favoriteId) {
-        await toggleWatched(favoriteId);
-        checkWatched();
-      }
+      checkPassed();
+      checkFavorite();
     } catch (err) {
-      setIsWatched(previousState);
-      console.warn("Failed to toggle watched:", err.message);
+      setIsPassed(previousState);
+      console.warn("Failed to toggle passed:", err.message);
     }
   };
 
@@ -200,7 +222,7 @@ export function MovieDetailsScreen({ route, navigation }) {
   };
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
+    <View style={styles.container}>
       {loading ? (
         <View style={styles.centerContainer}>
           <Text style={styles.loadingText}>Loading...</Text>
@@ -355,29 +377,42 @@ export function MovieDetailsScreen({ route, navigation }) {
           })()}
       </ScrollView>
       <View style={styles.stickyHeader}>
-        <Pressable style={styles.backButton} onPress={handleBack}>
+        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-down" size={24} color={colors.text.primary} />
         </Pressable>
         <View style={styles.stickyActions}>
-          <Pressable onPress={handleToggleFavorite}>
+          <Pressable onPressIn={() => Animated.spring(favScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(favScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleFavorite}>
+            <Animated.View style={{ transform: [{ scale: favScale }] }}>
             <Ionicons
-              name={isFavorite ? "heart" : "heart-outline"}
+              name={isFavorite ? "bookmark" : "bookmark-outline"}
               size={24}
-              color={isFavorite ? colors.favorite : "#fff"}
+              color={isFavorite ? colors.swipe.save : "#fff"}
             />
+            </Animated.View>
           </Pressable>
-          <Pressable onPress={handleToggleWatched} style={{ marginLeft: 16 }}>
+          <Pressable onPressIn={() => Animated.spring(passScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(passScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleTogglePassed} style={{ marginLeft: 16 }}>
+            <Animated.View style={{ transform: [{ scale: passScale }] }}>
             <Ionicons
-              name="eye"
+              name={isPassed ? "thumbs-down" : "thumbs-down-outline"}
               size={24}
-              color={isWatched ? colors.success : "#fff"}
+              color={isPassed ? colors.swipe.pass : "#fff"}
             />
+            </Animated.View>
+          </Pressable>
+          <Pressable onPressIn={() => Animated.spring(watchScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(watchScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleWatched} style={{ marginLeft: 16 }}>
+            <Animated.View style={{ transform: [{ scale: watchScale }] }}>
+            <Ionicons
+              name={isWatched ? "eye" : "eye-outline"}
+              size={24}
+              color={isWatched ? "#4488ff" : "#fff"}
+            />
+            </Animated.View>
           </Pressable>
         </View>
       </View>
         </>
       )}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -397,7 +432,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 10,
     zIndex: 10,
   },

@@ -13,7 +13,7 @@ import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { colors } from "../theme";
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, View, Animated, Pressable } from "react-native";
+import { ActivityIndicator, View, Animated, Pressable, Dimensions } from "react-native";
 import { withFadeTransition } from "../components/AnimatedScreen";
 
 const AuthStack = createNativeStackNavigator();
@@ -54,6 +54,7 @@ const AnimatedHomeScreen = withFadeTransition(HomeScreen);
 const AnimatedFavoritesScreen = withFadeTransition(FavoritesScreen);
 const AnimatedPickScreen = withFadeTransition(PickScreen);
 const AnimatedSettingsScreen = withFadeTransition(SettingsScreen);
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 function MoviesTabs() {
   return (
@@ -82,11 +83,11 @@ function MoviesTabs() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === "Browse") {
-            iconName = focused ? "star" : "star-outline";
+            iconName = focused ? "search" : "search-outline";
           } else if (route.name === "Favorites") {
-            iconName = focused ? "heart" : "heart-outline";
+            iconName = focused ? "bookmark" : "bookmark-outline";
           } else if (route.name === "Pick") {
-            iconName = focused ? "shuffle" : "shuffle-outline";
+            iconName = focused ? "swap-horizontal" : "swap-horizontal-outline";
           } else if (route.name === "Settings") {
             iconName = focused ? "settings" : "settings-outline";
           }
@@ -131,7 +132,31 @@ function AppStack() {
       <AppNav.Screen
         name="MovieDetails"
         component={MovieDetailsScreen}
-        options={{ cardStyle: { backgroundColor: colors.bg.primary } }}
+        options={{
+          cardStyle: { backgroundColor: colors.bg.primary },
+          cardStyleInterpolator: ({ current: { progress } }) => ({
+            cardStyle: {
+              transform: [
+                {
+                  translateY: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [SCREEN_HEIGHT, 0],
+                  }),
+                },
+              ],
+            },
+            overlayStyle: {
+              opacity: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.5],
+              }),
+            },
+          }),
+          transitionSpec: {
+            open: { animation: "spring", config: { damping: 20, stiffness: 120, mass: 1 } },
+            close: { animation: "timing", config: { duration: 400 } },
+          },
+        }}
       />
     </AppNav.Navigator>
   );

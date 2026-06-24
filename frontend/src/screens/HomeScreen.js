@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, RefreshControl, TextInput, LayoutAnimation } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View, FlatList, ScrollView, RefreshControl, TextInput } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +42,7 @@ export function HomeScreen() {
 
   const debounceRef = useRef(null);
   const rotation = useRef(new Animated.Value(0)).current;
+  const filterAnim = useRef(new Animated.Value(0)).current;
   const scaleAnims = useRef({});
 
   const getScaleAnim = (id) => {
@@ -49,6 +50,16 @@ export function HomeScreen() {
       scaleAnims.current[id] = new Animated.Value(1);
     }
     return scaleAnims.current[id];
+  };
+
+  const toggleFilters = () => {
+    const expanding = !showFilters;
+    setShowFilters(expanding);
+    Animated.timing(filterAnim, {
+      toValue: expanding ? 100 : 0,
+      duration: 450,
+      useNativeDriver: false,
+    }).start();
   };
 
   const fetchWatched = async () => {
@@ -207,15 +218,12 @@ export function HomeScreen() {
                 </Pressable>
               )}
             </View>
-            <Pressable onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setShowFilters((v) => !v);
-            }} style={styles.filterToggle}>
+            <Pressable onPress={toggleFilters} style={styles.filterToggle}>
               <Ionicons name={showFilters ? "options" : "options-outline"} size={24} color={colors.accent} />
             </Pressable>
           </View>
-          {showFilters && (
-          <>
+          <Animated.View style={[{ height: filterAnim, overflow: 'hidden' }]}>
+          <Animated.View style={{ transform: [{ translateY: filterAnim.interpolate({ inputRange: [0, 100], outputRange: [-100, 0] }) }] }}>
           {genres.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
               {genres.map((g) => {
@@ -264,8 +272,8 @@ export function HomeScreen() {
                 maxLength={3}
               />
             </View>
-          </>
-          )}
+          </Animated.View>
+          </Animated.View>
         </View>
 
         {query.length > 0 || selectedGenre ? (
@@ -334,7 +342,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
   searchContainer: {
     paddingTop: 55,
-    paddingHorizontal: 12,
     paddingBottom: 8,
     backgroundColor: colors.bg.primary,
     zIndex: 10,
@@ -342,17 +349,16 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 12,
   },
   searchBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.bg.card,
+    backgroundColor: "#1a1a1a",
     borderRadius: 10,
     paddingHorizontal: 12,
     height: 40,
-    borderWidth: 1,
-    borderColor: colors.accent,
   },
   searchInput: {
     flex: 1,
@@ -374,7 +380,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   filterContent: {
-    paddingRight: 12,
+    paddingHorizontal: 12,
   },
   filterChip: {
     paddingHorizontal: 14,
@@ -400,6 +406,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
+    paddingHorizontal: 12,
   },
   filterInput: {
     backgroundColor: "rgba(255,255,255,0.07)",
