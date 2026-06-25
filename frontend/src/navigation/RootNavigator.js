@@ -8,7 +8,7 @@ import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { PickScreen } from "../screens/PickScreen";
-import { FavoritesScreen } from "../screens/FavoritesScreen";
+import { LibraryScreen } from "../screens/LibraryScreen";
 import { MovieDetailsScreen } from "../screens/MovieDetailsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { colors } from "../theme";
@@ -51,7 +51,7 @@ function AnimatedTabButton({ children, onPress, accessibilityState, ...props }) 
 }
 
 const AnimatedHomeScreen = withFadeTransition(HomeScreen);
-const AnimatedFavoritesScreen = withFadeTransition(FavoritesScreen);
+const AnimatedLibraryScreen = withFadeTransition(LibraryScreen);
 const AnimatedPickScreen = withFadeTransition(PickScreen);
 const AnimatedSettingsScreen = withFadeTransition(SettingsScreen);
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -84,7 +84,7 @@ function MoviesTabs() {
           let iconName;
           if (route.name === "Browse") {
             iconName = focused ? "search" : "search-outline";
-          } else if (route.name === "Favorites") {
+          } else if (route.name === "Library") {
             iconName = focused ? "bookmark" : "bookmark-outline";
           } else if (route.name === "Pick") {
             iconName = focused ? "swap-horizontal" : "swap-horizontal-outline";
@@ -101,9 +101,9 @@ function MoviesTabs() {
         options={{ tabBarLabel: "Browse", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
       <Tab.Screen
-        name="Favorites"
-        component={AnimatedFavoritesScreen}
-        options={{ tabBarLabel: "Favorites", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
+        name="Library"
+        component={AnimatedLibraryScreen}
+        options={{ tabBarLabel: "Library", tabBarButton: (props) => <AnimatedTabButton {...props} /> }}
       />
       <Tab.Screen
         name="Pick"

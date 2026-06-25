@@ -5,6 +5,7 @@ from django.conf import settings
 class PickedMovie(models.Model):
     CHOICES = [
         ("saved", "Saved"),
+        ("liked", "Liked"),
         ("pass", "Pass"),
     ]
     user = models.ForeignKey(

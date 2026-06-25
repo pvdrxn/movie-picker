@@ -1,29 +1,40 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable } from "react-native";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
 import { getPicks, subscribePicks, subscribeWatched, getWatchedPicks } from "../api/picksApi";
 import { colors } from "../theme";
 
-export function FavoritesScreen() {
+const CHIPS = [
+  { key: "liked", label: "Liked" },
+  { key: "pass", label: "Disliked" },
+  { key: "saved", label: "Saved" },
+];
+
+export function LibraryScreen() {
   const navigation = useNavigation();
-  const [favorites, setFavorites] = useState([]);
+  const [selectedChip, setSelectedChip] = useState("saved");
+  const [movies, setMovies] = useState([]);
+  const [counts, setCounts] = useState({ liked: 0, pass: 0, saved: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchFavorites = useCallback(async () => {
+  const fetchMovies = useCallback(async () => {
     try {
-      const [data, watchedData] = await Promise.all([
-        getPicks("saved"),
+      const [[likedData, passData, savedData], watchedData] = await Promise.all([
+        Promise.all([getPicks("liked"), getPicks("pass"), getPicks("saved")]),
         getWatchedPicks()
       ]);
+      setCounts({ liked: likedData.length, pass: passData.length, saved: savedData.length });
+      const choiceMap = { liked: likedData, pass: passData, saved: savedData };
+      const data = choiceMap[selectedChip];
       const watchedIds = new Set(watchedData.map(w => Number(w.tmdb_id)));
-      const favoritesWithWatched = data.map(fav => ({
-        ...fav,
-        watched: watchedIds.has(Number(fav.tmdb_id))
+      const moviesWithWatched = data.map(item => ({
+        ...item,
+        watched: watchedIds.has(Number(item.tmdb_id))
       }));
-      setFavorites(favoritesWithWatched);
+      setMovies(moviesWithWatched);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -31,78 +42,81 @@ export function FavoritesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedChip]);
 
   useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
+    setLoading(true);
+    fetchMovies();
+  }, [fetchMovies]);
 
   useEffect(() => {
     const unsubscribePicks = subscribePicks(() => {
-      fetchFavorites();
+      fetchMovies();
     });
     const unsubscribeWatched = subscribeWatched(() => {
-      fetchFavorites();
+      fetchMovies();
     });
     return () => {
       unsubscribePicks();
       unsubscribeWatched();
     };
-  }, [fetchFavorites]);
+  }, [fetchMovies]);
 
   const handleRefresh = () => {
     if (refreshing) return;
     setRefreshing(true);
-    fetchFavorites();
+    fetchMovies();
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Favorites</Text>
-        </View>
-        <View style={styles.centered}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
+  const getEmptyMessage = () => {
+    if (selectedChip === "liked") return { title: "No liked movies", subtitle: "Like movies from Movie Details" };
+    if (selectedChip === "pass") return { title: "No disliked movies", subtitle: "Dislike movies from the Pick tab" };
+    return { title: "No saved movies", subtitle: "Save movies from the Pick tab" };
+  };
 
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Favorites</Text>
-        </View>
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      </View>
-    );
-  }
+  const emptyMsg = getEmptyMessage();
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Favorites</Text>
-        <Text style={styles.count}>{favorites.length} saved</Text>
+        <Text style={styles.title}>Library</Text>
       </View>
-      {favorites.length === 0 ? (
+      <View style={styles.chipsRow}>
+        {CHIPS.map(chip => (
+          <Pressable
+            key={chip.key}
+            style={[styles.chip, selectedChip === chip.key && styles.chipActive]}
+            onPress={() => setSelectedChip(chip.key)}
+          >
+            <Text style={[styles.chipText, selectedChip === chip.key && styles.chipTextActive]}>
+              {chip.label} ({counts[chip.key]})
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {loading ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>No favorites yet</Text>
-          <Text style={styles.emptySubtext}>Save movies from the Pick tab</Text>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : movies.length === 0 ? (
+        <View style={styles.centered}>
+          <Text style={styles.emptyText}>{emptyMsg.title}</Text>
+          <Text style={styles.emptySubtext}>{emptyMsg.subtitle}</Text>
         </View>
       ) : (
         <FlatList
-          data={favorites}
+          data={movies}
           numColumns={2}
           keyExtractor={(item) => item.id.toString()}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-               tintColor={colors.text.primary}
+              tintColor={colors.text.primary}
               colors={["#fff"]}
             />
           }
@@ -138,16 +152,35 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
     color: colors.text.primary,
     fontSize: 28,
     fontWeight: "800",
   },
-  count: {
+  chipsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.bg.elevated,
+  },
+  chipActive: {
+    backgroundColor: colors.text.primary,
+  },
+  chipText: {
     color: colors.text.tertiary,
     fontSize: 14,
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: colors.bg.primary,
   },
   centered: {
     flex: 1,

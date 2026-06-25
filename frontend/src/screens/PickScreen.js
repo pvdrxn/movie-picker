@@ -198,7 +198,7 @@ export function PickScreen() {
     const movie = moviesSnapshotRef.current[swipedIndex];
     if (!movie) return;
 
-    const choice = direction === "right" ? "saved" : "pass";
+    const choice = direction === "right" ? "liked" : "pass";
 
     try {
       await addPick({
@@ -373,7 +373,7 @@ export function PickScreen() {
             styles.cardRating,
             { color: (movie.vote_average || 0) >= 8 ? colors.rating : colors.text.primary }
           ]}>
-            ★ {movie.vote_average?.toFixed(1) || "N/A"}
+            ★ {(movie.vote_average != null) ? Number(movie.vote_average).toFixed(1) : "N/A"}
           </Text>
         </LinearGradient>
       </Pressable>
@@ -414,7 +414,7 @@ export function PickScreen() {
       <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: "#ef4444", opacity: leftOverlayOpacity }]} />
       <View style={{ alignItems: "center", paddingBottom: 120 }}>
       <Text style={[styles.subtitle, { marginTop: 30 }]}>
-        <Text style={{ color: colors.swipe.pass }}>Left to pass</Text> · <Text style={{ color: colors.swipe.save }}>right to save</Text>
+        <Text style={{ color: colors.swipe.pass }}>Left to dislike</Text> · <Text style={{ color: colors.swipe.save }}>Right to like</Text>
       </Text>
       <Text style={{ color: colors.text.primary, fontSize: 13, marginTop: -20 }}>tap for synopsis</Text>
 

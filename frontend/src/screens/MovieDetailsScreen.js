@@ -27,9 +27,12 @@ export function MovieDetailsScreen({ route, navigation }) {
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likedId, setLikedId] = useState(null);
   const [isWatched, setIsWatched] = useState(false);
   const [isPassed, setIsPassed] = useState(false);
   const favScale = useRef(new Animated.Value(1)).current;
+  const likeScale = useRef(new Animated.Value(1)).current;
   const passScale = useRef(new Animated.Value(1)).current;
   const watchScale = useRef(new Animated.Value(1)).current;
 
@@ -78,6 +81,17 @@ export function MovieDetailsScreen({ route, navigation }) {
     }
   }, [movieId]);
 
+  const checkLiked = useCallback(async () => {
+    try {
+      const picks = await getPicks("liked");
+      const found = picks.find(p => p.tmdb_id === movieId);
+      setIsLiked(!!found);
+      setLikedId(found ? found.id : null);
+    } catch (err) {
+      console.warn("Failed to check liked:", err.message);
+    }
+  }, [movieId]);
+
   const checkPassed = useCallback(async () => {
     try {
       const picks = await getPicks("pass");
@@ -90,17 +104,19 @@ export function MovieDetailsScreen({ route, navigation }) {
 
   useEffect(() => {
     checkFavorite();
+    checkLiked();
     checkWatched();
     checkPassed();
-  }, [checkFavorite, checkWatched, checkPassed]);
+  }, [checkFavorite, checkLiked, checkWatched, checkPassed]);
 
   useEffect(() => {
     const unsubscribePicks = subscribePicks(() => {
       checkFavorite();
+      checkLiked();
       checkPassed();
     });
     return unsubscribePicks;
-  }, [checkFavorite, checkPassed]);
+  }, [checkFavorite, checkLiked, checkPassed]);
 
   useEffect(() => {
     const unsubscribeWatched = subscribeWatched(() => {
@@ -117,7 +133,7 @@ export function MovieDetailsScreen({ route, navigation }) {
     try {
       if (isFavorite) {
         if (favoriteId) {
-          await deletePick(favoriteId, { notify: false });
+          await deletePick(favoriteId, { notify: true });
         }
       } else {
         await addPick({
@@ -126,15 +142,46 @@ export function MovieDetailsScreen({ route, navigation }) {
           posterPath: movie.poster_path,
           rating: movie.vote_average ?? undefined,
           choice: "saved",
-          notify: false,
+          notify: true,
         });
       }
       checkFavorite();
+      checkLiked();
       checkPassed();
     } catch (err) {
       setIsFavorite(previousState);
       setFavoriteId(previousId);
       console.warn("Failed to toggle favorite:", err.message);
+    }
+  };
+
+  const handleToggleLike = async () => {
+    if (!movie) return;
+    const previousState = isLiked;
+    const previousId = likedId;
+    setIsLiked(!isLiked);
+    try {
+      if (isLiked) {
+        if (likedId) {
+          await deletePick(likedId, { notify: true });
+        }
+      } else {
+        await addPick({
+          tmdbId: movie.id,
+          title: movie.title,
+          posterPath: movie.poster_path,
+          rating: movie.vote_average ?? undefined,
+          choice: "liked",
+          notify: true,
+        });
+      }
+      checkLiked();
+      checkFavorite();
+      checkPassed();
+    } catch (err) {
+      setIsLiked(previousState);
+      setLikedId(previousId);
+      console.warn("Failed to toggle like:", err.message);
     }
   };
 
@@ -153,7 +200,7 @@ export function MovieDetailsScreen({ route, navigation }) {
           posterPath: movie.poster_path,
           rating: movie.vote_average ?? undefined,
           choice: "pass",
-          notify: false,
+          notify: true,
         });
         await toggleWatched(data.id);
       }
@@ -173,11 +220,11 @@ export function MovieDetailsScreen({ route, navigation }) {
         const picks = await getPicks("pass");
         const found = picks.find(p => p.tmdb_id === movieId);
         if (found) {
-          await deletePick(found.id, { notify: false });
+          await deletePick(found.id, { notify: true });
         }
       } else {
         if (isFavorite && favoriteId) {
-          await deletePick(favoriteId, { notify: false });
+          await deletePick(favoriteId, { notify: true });
         }
         await addPick({
           tmdbId: movie.id,
@@ -185,11 +232,12 @@ export function MovieDetailsScreen({ route, navigation }) {
           posterPath: movie.poster_path,
           rating: movie.vote_average ?? undefined,
           choice: "pass",
-          notify: false,
+          notify: true,
         });
       }
       checkPassed();
       checkFavorite();
+      checkLiked();
     } catch (err) {
       setIsPassed(previousState);
       console.warn("Failed to toggle passed:", err.message);
@@ -277,7 +325,7 @@ export function MovieDetailsScreen({ route, navigation }) {
               <Text style={styles.title}>{movie.title}</Text>
             </View>
             <View style={styles.ratingRow}>
-              <Text style={styles.rating}>★ {movie.vote_average?.toFixed(1) || "N/A"}</Text>
+              <Text style={styles.rating}>★ {(movie.vote_average != null) ? Number(movie.vote_average).toFixed(1) : "N/A"}</Text>
               {(() => {
                 const ratings = getRatings();
                 if (ratings.length === 0) return null;
@@ -381,30 +429,41 @@ export function MovieDetailsScreen({ route, navigation }) {
           <Ionicons name="chevron-down" size={24} color={colors.text.primary} />
         </Pressable>
         <View style={styles.stickyActions}>
-          <Pressable onPressIn={() => Animated.spring(favScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(favScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleFavorite}>
-            <Animated.View style={{ transform: [{ scale: favScale }] }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Pressable onPressIn={() => Animated.spring(watchScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(watchScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleWatched}>
+              <Animated.View style={{ transform: [{ scale: watchScale }] }}>
+              <Ionicons
+                name={isWatched ? "eye" : "eye-outline"}
+                size={24}
+                color={isWatched ? "#4488ff" : "#fff"}
+              />
+              </Animated.View>
+            </Pressable>
+            <Pressable onPressIn={() => Animated.spring(favScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(favScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleFavorite} style={{ marginLeft: 16 }}>
+              <Animated.View style={{ transform: [{ scale: favScale }] }}>
+              <Ionicons
+                name={isFavorite ? "bookmark" : "bookmark-outline"}
+                size={24}
+                color={isFavorite ? "#4488ff" : "#fff"}
+              />
+              </Animated.View>
+            </Pressable>
+          </View>
+          <Pressable onPressIn={() => Animated.spring(likeScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(likeScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleLike} style={{ marginTop: 8 }}>
+            <Animated.View style={{ transform: [{ scale: likeScale }] }}>
             <Ionicons
-              name={isFavorite ? "bookmark" : "bookmark-outline"}
+              name={isLiked ? "thumbs-up" : "thumbs-up-outline"}
               size={24}
-              color={isFavorite ? colors.swipe.save : "#fff"}
+              color={isLiked ? colors.swipe.save : "#fff"}
             />
             </Animated.View>
           </Pressable>
-          <Pressable onPressIn={() => Animated.spring(passScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(passScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleTogglePassed} style={{ marginLeft: 16 }}>
+          <Pressable onPressIn={() => Animated.spring(passScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(passScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleTogglePassed} style={{ marginTop: 8 }}>
             <Animated.View style={{ transform: [{ scale: passScale }] }}>
             <Ionicons
               name={isPassed ? "thumbs-down" : "thumbs-down-outline"}
               size={24}
               color={isPassed ? colors.swipe.pass : "#fff"}
-            />
-            </Animated.View>
-          </Pressable>
-          <Pressable onPressIn={() => Animated.spring(watchScale, { toValue: 0.8, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPressOut={() => Animated.spring(watchScale, { toValue: 1, useNativeDriver: true, damping: 10, stiffness: 200 }).start()} onPress={handleToggleWatched} style={{ marginLeft: 16 }}>
-            <Animated.View style={{ transform: [{ scale: watchScale }] }}>
-            <Ionicons
-              name={isWatched ? "eye" : "eye-outline"}
-              size={24}
-              color={isWatched ? "#4488ff" : "#fff"}
             />
             </Animated.View>
           </Pressable>
@@ -431,14 +490,14 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 30,
+    alignItems: "flex-start",
+    paddingTop: 35,
     paddingHorizontal: 10,
     zIndex: 10,
   },
   stickyActions: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
+    alignItems: "flex-end",
   },
   topBarPlaceholder: {
     height: 90,
@@ -449,6 +508,7 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     justifyContent: "center",
     alignItems: "center",
+    marginTop: -10,
   },
   header: {
     flexDirection: "row",
