@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable } from "react-native";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable, Animated } from "react-native";
 import { MovieCard } from "../components/MovieCard";
 import { useNavigation } from "@react-navigation/native";
 import { getPicks, subscribePicks, subscribeWatched, getWatchedPicks } from "../api/picksApi";
 import { colors } from "../theme";
+
+const CHIP_COLORS = {
+  liked: colors.swipe.save,
+  pass: colors.swipe.pass,
+  saved: colors.swipe.saved,
+};
 
 const CHIPS = [
   { key: "liked", label: "Liked" },
@@ -62,6 +68,34 @@ export function LibraryScreen() {
     };
   }, [fetchMovies]);
 
+  const scaleAnims = useRef({});
+
+  const getScaleAnim = (key) => {
+    if (!scaleAnims.current[key]) {
+      scaleAnims.current[key] = new Animated.Value(1);
+    }
+    return scaleAnims.current[key];
+  };
+
+  const handleChipPress = (key) => {
+    const prev = selectedChip;
+    if (prev && scaleAnims.current[prev]) {
+      Animated.timing(scaleAnims.current[prev], {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+    if (key !== prev) {
+      Animated.timing(getScaleAnim(key), {
+        toValue: 1.08,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+    setSelectedChip(key);
+  };
+
   const handleRefresh = () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -82,17 +116,32 @@ export function LibraryScreen() {
         <Text style={styles.title}>Library</Text>
       </View>
       <View style={styles.chipsRow}>
-        {CHIPS.map(chip => (
-          <Pressable
-            key={chip.key}
-            style={[styles.chip, selectedChip === chip.key && styles.chipActive]}
-            onPress={() => setSelectedChip(chip.key)}
-          >
-            <Text style={[styles.chipText, selectedChip === chip.key && styles.chipTextActive]}>
-              {chip.label} ({counts[chip.key]})
-            </Text>
-          </Pressable>
-        ))}
+        {CHIPS.map(chip => {
+          const isActive = selectedChip === chip.key;
+          const chipColor = CHIP_COLORS[chip.key];
+          return (
+            <Pressable
+              key={chip.key}
+              onPress={() => handleChipPress(chip.key)}
+            >
+              <Animated.View
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: isActive ? chipColor : colors.bg.elevated,
+                    borderColor: isActive ? chipColor : "transparent",
+                    borderWidth: 1,
+                    transform: [{ scale: getScaleAnim(chip.key) }],
+                  },
+                ]}
+              >
+                <Text style={[styles.chipText, { color: isActive ? "#fff" : colors.text.tertiary }]}>
+                  {chip.label} ({counts[chip.key]})
+                </Text>
+              </Animated.View>
+            </Pressable>
+          );
+        })}
       </View>
       {loading ? (
         <View style={styles.centered}>
@@ -169,18 +218,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: colors.bg.elevated,
-  },
-  chipActive: {
-    backgroundColor: colors.text.primary,
   },
   chipText: {
-    color: colors.text.tertiary,
     fontSize: 14,
     fontWeight: "600",
-  },
-  chipTextActive: {
-    color: colors.bg.primary,
   },
   centered: {
     flex: 1,

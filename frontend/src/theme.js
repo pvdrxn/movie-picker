@@ -13,12 +13,13 @@ export const colors = {
   },
   accent: "#E50914",
   accentSecondary: "#FF6B6B",
-  success: "#22C55E",
+  success: "#16a34a",
   rating: "#FBBF24",
   favorite: "#FF6464",
   swipe: {
-    pass: "#ef4444",
-    save: "#22c55e",
+    pass: "#E50914",
+    save: "#16a34a",
+    saved: "#4488ff",
   },
   genre: {
     Action: "#ff4444",

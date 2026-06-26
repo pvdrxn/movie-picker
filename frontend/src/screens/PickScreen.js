@@ -5,7 +5,7 @@ import { fetchPopularMovies, fetchGenres, fetchMovieCredits, fetchMovieDetails }
 import { addPick, getPicks, subscribePicks } from "../api/picksApi";
 import { colors } from "../theme";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const SWIPE_THRESHOLD = 125;
 
@@ -40,6 +40,31 @@ export function PickScreen() {
   const isSwiping = useRef(false);
   const rightOverlayOpacity = useRef(new Animated.Value(0)).current;
   const leftOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const upOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  const backCardScale = useRef(
+    Animated.add(
+      new Animated.Value(0.9),
+      Animated.multiply(
+        new Animated.Value(0.1),
+        Animated.subtract(
+          new Animated.Value(1),
+          Animated.multiply(
+            Animated.subtract(new Animated.Value(1), pan.x.interpolate({
+              inputRange: [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
+              outputRange: [1, 0, 1],
+              extrapolate: "clamp",
+            })),
+            Animated.subtract(new Animated.Value(1), pan.y.interpolate({
+              inputRange: [-SWIPE_THRESHOLD, 0],
+              outputRange: [1, 0],
+              extrapolate: "clamp",
+            })),
+          ),
+        ),
+      ),
+    )
+  ).current;
 
   const loadMovies = async (reset = false, replace = false) => {
     if (!reset && !replace && loadingRef.current) return;
@@ -123,7 +148,6 @@ export function PickScreen() {
         const ids = new Set(picks.map(p => p.tmdb_id));
         setPickedIds(ids);
         pickedIdsRef.current = ids;
-        setMovies(prev => prev.filter(m => !ids.has(m.id)));
       } catch (err) {
         console.warn("Failed to refresh picks:", err);
       }
@@ -198,7 +222,7 @@ export function PickScreen() {
     const movie = moviesSnapshotRef.current[swipedIndex];
     if (!movie) return;
 
-    const choice = direction === "right" ? "liked" : "pass";
+    const choice = direction === "right" ? "liked" : direction === "up" ? "saved" : "pass";
 
     try {
       await addPick({
@@ -212,7 +236,7 @@ export function PickScreen() {
       console.warn("Failed to save pick:", err);
     }
 
-    if (direction === "right") {
+    if (direction === "right" || direction === "up") {
       setSavedCount((c) => c + 1);
     } else {
       setPassCount((c) => c + 1);
@@ -247,15 +271,17 @@ export function PickScreen() {
 
   const finishSwipe = useCallback((direction) => {
     const targetX = direction === "right" ? SCREEN_WIDTH * 2 : -(SCREEN_WIDTH * 2);
+    const targetY = direction === "up" ? -(SCREEN_HEIGHT * 2) : 0;
     const wasExpanded = expandedRef.current;
     Animated.timing(pan, {
-      toValue: { x: targetX, y: 0 },
+      toValue: { x: direction === "up" ? 0 : targetX, y: targetY },
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
       isSwiping.current = false;
       rightOverlayOpacity.setValue(0);
       leftOverlayOpacity.setValue(0);
+      upOverlayOpacity.setValue(0);
       const idx = cardIndexRef.current;
       handleSwiped(direction, idx);
 
@@ -278,20 +304,27 @@ export function PickScreen() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => !isSwiping.current && Math.abs(g.dx) > 10,
+      onMoveShouldSetPanResponder: (_, g) => !isSwiping.current && (Math.abs(g.dx) > 10 || g.dy < -10),
       onPanResponderGrant: () => {
         isSwiping.current = true;
       },
       onPanResponderMove: (_, g) => {
-        pan.setValue({ x: g.dx, y: 0 });
-        const progress = Math.min(Math.abs(g.dx) / SWIPE_THRESHOLD, 1);
-        const opacity = progress * 0.5;
+        pan.setValue({ x: g.dx, y: g.dy });
+        const horizProgress = Math.min(Math.abs(g.dx) / SWIPE_THRESHOLD, 1);
+        const horizOpacity = horizProgress * 0.5;
+        const vertProgress = Math.min(Math.abs(g.dy) / SWIPE_THRESHOLD, 1);
+        const vertOpacity = vertProgress * 0.5;
         if (g.dx > 0) {
-          rightOverlayOpacity.setValue(opacity);
+          rightOverlayOpacity.setValue(horizOpacity);
           leftOverlayOpacity.setValue(0);
         } else {
-          leftOverlayOpacity.setValue(opacity);
+          leftOverlayOpacity.setValue(horizOpacity);
           rightOverlayOpacity.setValue(0);
+        }
+        if (g.dy < 0) {
+          upOverlayOpacity.setValue(vertOpacity);
+        } else {
+          upOverlayOpacity.setValue(0);
         }
       },
       onPanResponderRelease: (_, g) => {
@@ -299,9 +332,12 @@ export function PickScreen() {
           finishSwipe("right");
         } else if (g.dx < -SWIPE_THRESHOLD) {
           finishSwipe("left");
+        } else if (g.dy < -SWIPE_THRESHOLD) {
+          finishSwipe("up");
         } else {
           rightOverlayOpacity.setValue(0);
           leftOverlayOpacity.setValue(0);
+          upOverlayOpacity.setValue(0);
           Animated.spring(pan, {
             toValue: { x: 0, y: 0 },
             useNativeDriver: true,
@@ -315,6 +351,7 @@ export function PickScreen() {
       onPanResponderTerminate: () => {
         rightOverlayOpacity.setValue(0);
         leftOverlayOpacity.setValue(0);
+        upOverlayOpacity.setValue(0);
         Animated.spring(pan, {
           toValue: { x: 0, y: 0 },
           useNativeDriver: true,
@@ -410,11 +447,12 @@ export function PickScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: "#22c55e", opacity: rightOverlayOpacity }]} />
-      <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: "#ef4444", opacity: leftOverlayOpacity }]} />
+      <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: colors.swipe.save, opacity: rightOverlayOpacity }]} />
+      <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: colors.swipe.pass, opacity: leftOverlayOpacity }]} />
+      <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { backgroundColor: colors.swipe.saved, opacity: upOverlayOpacity }]} />
       <View style={{ alignItems: "center", paddingBottom: 120 }}>
       <Text style={[styles.subtitle, { marginTop: 30 }]}>
-        <Text style={{ color: colors.swipe.pass }}>Left to dislike</Text> · <Text style={{ color: colors.swipe.save }}>Right to like</Text>
+        <Text style={{ color: colors.swipe.pass }}>Left to dislike</Text> · <Text style={{ color: colors.swipe.save }}>Right to like</Text> · <Text style={{ color: colors.swipe.saved }}>Up to save</Text>
       </Text>
       <Text style={{ color: colors.text.primary, fontSize: 13, marginTop: -20 }}>tap for synopsis</Text>
 
@@ -427,13 +465,7 @@ export function PickScreen() {
                   styles.cardStackBack,
                   {
                     transform: [
-                      {
-                        scale: pan.x.interpolate({
-                          inputRange: [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
-                          outputRange: [1, 0.9, 1],
-                          extrapolate: "clamp",
-                        }),
-                      },
+                      { scale: backCardScale },
                     ],
                   },
                 ]}
@@ -448,6 +480,7 @@ export function PickScreen() {
                   {
                     transform: [
                       { translateX: pan.x },
+                      { translateY: pan.y },
                       { rotate: cardRotate },
                     ],
                   },
